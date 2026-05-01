@@ -11,6 +11,53 @@ public API while extraction from the private monorepo is in progress.
 
 (no changes)
 
+## [0.2.0] - 2026-05-01
+
+### Added
+
+- **Tier B extraction (Phase 1).** The first Tier B module lands as the
+  cleanest cut: a 100% pure scorer with zero DB / network dependency.
+- `siglume_agent_core.installed_tool_prefilter` — TF-IDF + cosine
+  similarity over Latin words and CJK character bigrams. Picks the top-N
+  most-relevant tools when an agent has many bound, so the chat system
+  prompt stays within the input token budget. Public surface:
+  `select_top_tools_for_prompt(installed_tools, user_message, *, max_tools=50)`.
+- `siglume_agent_core.types.ResolvedToolDefinition` — the value-shape
+  prefilter and (future) Tier B modules accept. Pure dataclass, mirrors
+  the platform's resolver output.
+
+### Background
+
+The recurring publisher question for v0.2 was "why didn't my listing get
+picked when it matched?" — the answer is partly in this module. The
+selection scorer is the open-readable half. Future v0.2.x releases will
+add the keyword-trigger scorer (currently `ToolSelector._score`) once
+its DB-coupled portions are factored behind a repository interface.
+
+The siglume monorepo's `installed_tool_prefilter.py` becomes a thin
+re-export shim of this package's symbols — production runs on the same
+code that ships here.
+
+### Roadmap
+
+- **v0.3 (Tier B Phase 2)**: extract `tool_selector` keyword scorer,
+  pure halves of `dev_simulator` and `capability_failure_learning`.
+  Requires a repository-interface pattern (`SaveUnmatchedRequest`,
+  `LoadMemoryCardsByAgent`) for the DB-touching code paths.
+- **v0.4 (Tier C)**: split `tool_use_runtime.orchestrate` into a
+  pure-planner half (open) and a platform-glue half (private).
+
+See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the full extraction plan.
+
+### Distribution
+
+Install:
+```bash
+pip install siglume-agent-core            # core only
+pip install siglume-agent-core[anthropic] # + Anthropic adapter
+pip install siglume-agent-core[openai]    # + OpenAI adapter
+```
+
 ## [0.1.0] - 2026-05-01
 
 ### Added
