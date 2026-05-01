@@ -32,12 +32,12 @@ pip install siglume-agent-core[dev]       # + test/lint deps
 
 ## What's in this release (Phase 1, Tier A)
 
-### `orchestrator_core.tool_manual_validator`
+### `siglume_agent_core.tool_manual_validator`
 
 The exact same validator Siglume runs to grade publisher-submitted tool manuals (A / B / C / D / F). Use it locally to predict your manual's grade before submission:
 
 ```python
-from orchestrator_core.tool_manual_validator import validate_tool_manual, score_manual_quality
+from siglume_agent_core.tool_manual_validator import validate_tool_manual, score_manual_quality
 
 manual = {...}  # your tool manual dict
 
@@ -53,13 +53,13 @@ print(f"Publishable: {quality.publishable}")
 
 This is **byte-equivalent** to the server-side scorer — verified by CI parity test against the Siglume monorepo. If your local grade is B, the server grade is B.
 
-### `orchestrator_core.provider_adapters`
+### `siglume_agent_core.provider_adapters`
 
 Provider-specific adapters that convert an internal tool definition + message thread into the format Anthropic's or OpenAI's tool-use API expects, and parse the response back into a uniform shape.
 
 ```python
-from orchestrator_core.provider_adapters.anthropic_tools import AnthropicToolAdapter
-from orchestrator_core.provider_adapters.types import ToolMessage
+from siglume_agent_core.provider_adapters.anthropic_tools import AnthropicToolAdapter
+from siglume_agent_core.provider_adapters.types import ToolMessage
 
 adapter = AnthropicToolAdapter()
 turn = adapter.run_turn(

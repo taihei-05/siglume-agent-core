@@ -9,12 +9,12 @@ from __future__ import annotations
 
 
 def test_package_version_present():
-    import orchestrator_core
-    assert orchestrator_core.__version__ == "0.1.0"
+    import siglume_agent_core
+    assert siglume_agent_core.__version__ == "0.1.0"
 
 
 def test_tool_manual_validator_imports():
-    from orchestrator_core.tool_manual_validator import (
+    from siglume_agent_core.tool_manual_validator import (
         score_manual_quality,
         validate_tool_manual,
     )
@@ -24,7 +24,7 @@ def test_tool_manual_validator_imports():
 
 def test_validate_tool_manual_minimal_happy_path():
     """A minimal but well-formed manual should pass structural validation."""
-    from orchestrator_core.tool_manual_validator import validate_tool_manual
+    from siglume_agent_core.tool_manual_validator import validate_tool_manual
 
     manual = {
         "capability_key": "translate_text",
@@ -58,7 +58,7 @@ def test_validate_tool_manual_minimal_happy_path():
 
 
 def test_score_manual_quality_returns_grade():
-    from orchestrator_core.tool_manual_validator import score_manual_quality
+    from siglume_agent_core.tool_manual_validator import score_manual_quality
 
     manual = {
         "capability_key": "echo",
@@ -75,7 +75,7 @@ def test_score_manual_quality_returns_grade():
 
 
 def test_provider_adapter_types_import():
-    from orchestrator_core.provider_adapters.types import ToolMessage
+    from siglume_agent_core.provider_adapters.types import ToolMessage
     msg = ToolMessage(role="user", content="hello")
     assert msg.role == "user"
     assert msg.content == "hello"
@@ -83,9 +83,9 @@ def test_provider_adapter_types_import():
 
 def test_anthropic_adapter_imports_without_sdk():
     """The adapter module should import even if the anthropic SDK isn't installed."""
-    from orchestrator_core.provider_adapters import anthropic_tools  # noqa: F401
+    from siglume_agent_core.provider_adapters import anthropic_tools  # noqa: F401
 
 
 def test_openai_adapter_imports_without_sdk():
     """The adapter module should import even if the openai SDK isn't installed."""
-    from orchestrator_core.provider_adapters import openai_tools  # noqa: F401
+    from siglume_agent_core.provider_adapters import openai_tools  # noqa: F401

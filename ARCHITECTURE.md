@@ -18,10 +18,10 @@ The Siglume agent runtime is roughly 10 KLOC of orchestrator code in the private
 
 **Modules included:**
 
-- `orchestrator_core.tool_manual_validator` (~1,080 LOC) — manual quality scoring (grade A–F)
-- `orchestrator_core.provider_adapters.types` (~40 LOC) — common tool-use abstractions
-- `orchestrator_core.provider_adapters.anthropic_tools` (~190 LOC) — Anthropic tool-use API adapter
-- `orchestrator_core.provider_adapters.openai_tools` (~200 LOC) — OpenAI tool-use API adapter
+- `siglume_agent_core.tool_manual_validator` (~1,080 LOC) — manual quality scoring (grade A–F)
+- `siglume_agent_core.provider_adapters.types` (~40 LOC) — common tool-use abstractions
+- `siglume_agent_core.provider_adapters.anthropic_tools` (~190 LOC) — Anthropic tool-use API adapter
+- `siglume_agent_core.provider_adapters.openai_tools` (~200 LOC) — OpenAI tool-use API adapter
 
 These have no `agent_sns.*` imports in the private monorepo, so they were lifted as-is. The Siglume monorepo is being updated to import from this package as the single source of truth.
 
@@ -31,14 +31,14 @@ These have no `agent_sns.*` imports in the private monorepo, so they were lifted
 
 **Modules planned:**
 
-- `orchestrator_core.tool_selector` — keyword scoring + candidate ranking (the core "why was my tool picked / not picked?" logic)
-- `orchestrator_core.installed_tool_resolver` — agent-installed-tool resolution (decoupled from ORM)
-- `orchestrator_core.installed_tool_prefilter` — top-N prefilter
-- `orchestrator_core.dev_simulator` — dry-run planner (the engine behind `siglume dev simulate`)
-- `orchestrator_core.seller_analytics` — selection-miss derivation, keyword-suggestion logic
-- `orchestrator_core.capability_failure_learning` — per-tool failure-pattern learning
-- `orchestrator_core.execution_adapter` — adapter config normalization
-- `orchestrator_core.connected_account_requirements` — requirements normalization (no secrets)
+- `siglume_agent_core.tool_selector` — keyword scoring + candidate ranking (the core "why was my tool picked / not picked?" logic)
+- `siglume_agent_core.installed_tool_resolver` — agent-installed-tool resolution (decoupled from ORM)
+- `siglume_agent_core.installed_tool_prefilter` — top-N prefilter
+- `siglume_agent_core.dev_simulator` — dry-run planner (the engine behind `siglume dev simulate`)
+- `siglume_agent_core.seller_analytics` — selection-miss derivation, keyword-suggestion logic
+- `siglume_agent_core.capability_failure_learning` — per-tool failure-pattern learning
+- `siglume_agent_core.execution_adapter` — adapter config normalization
+- `siglume_agent_core.connected_account_requirements` — requirements normalization (no secrets)
 
 **Refactor required**: these modules currently import SQLAlchemy ORM models from the private monorepo. The Phase 2 PR introduces equivalent agent-core-native dataclasses; the platform converts ORM ↔ dataclass at the public/private boundary. The Siglume monorepo keeps the ORM definitions; the OSS package speaks only in dataclasses.
 
@@ -50,7 +50,7 @@ These have no `agent_sns.*` imports in the private monorepo, so they were lifted
 
 The Phase 3 PR splits it:
 
-- **OSS half (`orchestrator_core.tool_use_runtime`)**: pure planner — given a tool inventory + message thread + LLM adapter, run the multi-turn loop and return the planned chain. No DB, no policy gate, no payment.
+- **OSS half (`siglume_agent_core.tool_use_runtime`)**: pure planner — given a tool inventory + message thread + LLM adapter, run the multi-turn loop and return the planned chain. No DB, no policy gate, no payment.
 - **Private half (still in monorepo)**: platform-glue layer that wires the pure planner to the live agent's intent records, capability gateway, owner-operation registry, etc.
 
 After Phase 3, ~70% of `capability_runtime/` is open-source.
