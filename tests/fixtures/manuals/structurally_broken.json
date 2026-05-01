@@ -1,0 +1,6 @@
+{
+  "tool_name": "broken",
+  "permission_class": "read_only",
+  "input_schema": {},
+  "output_schema": {}
+}

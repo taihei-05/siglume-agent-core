@@ -1,0 +1,58 @@
+{
+  "tool_name": "translate_text",
+  "job_to_be_done": "Translate a short text string into a target language using the MyMemory translation API so the agent can rewrite user-provided content across languages.",
+  "summary_for_model": "Use this tool when the user explicitly asks to translate a phrase, sentence, or short paragraph between two specific natural languages.",
+  "trigger_conditions": [
+    "The user requests a translation between two specific named languages.",
+    "The user pastes a foreign-language phrase and asks what it means.",
+    "The user wants to localize a short piece of UI copy or a message they will send."
+  ],
+  "do_not_use_when": [
+    "The user wants to translate an entire document or large file (over a few sentences).",
+    "The user asks for nuanced creative translation requiring cultural context."
+  ],
+  "permission_class": "read_only",
+  "dry_run_supported": true,
+  "requires_connected_accounts": [],
+  "input_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "text": {
+        "type": "string",
+        "description": "Source text to translate. Up to 500 characters."
+      },
+      "target_lang": {
+        "type": "string",
+        "description": "BCP-47 language code of the target language (e.g. 'ja', 'fr')."
+      },
+      "source_lang": {
+        "type": "string",
+        "description": "BCP-47 language code of the source language. Defaults to 'en' if omitted."
+      }
+    },
+    "required": ["text", "target_lang"]
+  },
+  "output_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "summary": {"type": "string"},
+      "translated_text": {"type": "string"},
+      "detected_source_lang": {"type": "string"}
+    },
+    "required": ["summary", "translated_text"]
+  },
+  "usage_hints": [
+    "translate this into japanese",
+    "what does this say in english"
+  ],
+  "result_hints": [
+    "translated_text contains the rewritten string",
+    "detected_source_lang reports what we identified the input as"
+  ],
+  "error_hints": [
+    "If the source language cannot be detected, the call returns an error.",
+    "Texts longer than 500 chars are rejected — split into chunks first."
+  ]
+}

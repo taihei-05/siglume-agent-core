@@ -1,0 +1,35 @@
+{
+  "tool_name": "do_thing",
+  "job_to_be_done": "Does a thing.",
+  "summary_for_model": "Does stuff.",
+  "trigger_conditions": [
+    "When user wants it.",
+    "Other times.",
+    "If needed."
+  ],
+  "do_not_use_when": [
+    "When not needed."
+  ],
+  "permission_class": "read_only",
+  "dry_run_supported": false,
+  "requires_connected_accounts": [],
+  "input_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "x": {"type": "string"}
+    },
+    "required": ["x"]
+  },
+  "output_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "summary": {"type": "string"}
+    },
+    "required": ["summary"]
+  },
+  "usage_hints": [],
+  "result_hints": [],
+  "error_hints": []
+}
