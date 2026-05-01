@@ -67,7 +67,10 @@ _INJECTION_PATTERNS: tuple[str, ...] = (
     "bypass safety",
     "bypass guardrails",
     "you are now",
-    "act as if",
+    # Removed "act as if" — appears in benign technical copy like
+    # "if omitted, treat as if value is 0". Codex review on PR #5
+    # flagged the false-positive risk; the validator hard-fails on
+    # any match so this would reject legitimate publisher manuals.
     "pretend you are",
     "<|im_start|>",
     "<|im_end|>",
@@ -635,6 +638,33 @@ def _check_platform_injected_recursive(
                 )
 
 
+def _check_one_description(text: Any, path: str, errs: list[str]) -> None:
+    """Apply length cap + injection-pattern check to a single description
+    string. Factored out so callers can decide WHICH descriptions to
+    pass in (we deliberately do not check the root input_schema's own
+    `description` — only descriptions on inner property / array-items /
+    composition-branch schemas, which are what get embedded in the LLM
+    tool catalog block at runtime).
+    """
+    if not isinstance(text, str):
+        return
+    if len(text) > MAX_PROPERTY_DESCRIPTION_LEN:
+        location = f" at {path}" if path else ""
+        errs.append(
+            f"Property description exceeds {MAX_PROPERTY_DESCRIPTION_LEN} chars "
+            f"(got {len(text)}){location}"
+        )
+    lowered = text.lower()
+    for marker in _INJECTION_PATTERNS:
+        if marker.lower() in lowered:
+            location = f" at {path}" if path else ""
+            errs.append(
+                f"Property description contains a known prompt-injection "
+                f"pattern ({marker!r}){location}"
+            )
+            return  # one error per description is enough; don't spam
+
+
 def _check_property_descriptions(
     schema: Any,
     errs: list[str],
@@ -642,40 +672,37 @@ def _check_property_descriptions(
 ) -> None:
     """Walk every property at every depth, flagging description fields
     that exceed ``MAX_PROPERTY_DESCRIPTION_LEN`` or contain known prompt-
-    injection patterns. Property descriptions are embedded in the LLM
-    tool catalog block at runtime, so a malicious publisher could
-    otherwise plant instructions there.
+    injection patterns.
+
+    Deliberate scope: the root ``input_schema``'s OWN ``description`` is
+    NOT checked — only descriptions on (a) properties at any depth,
+    (b) array ``items`` schemas, and (c) composition-branch schemas
+    (``oneOf`` / ``anyOf`` / ``allOf`` entries). Those are the values
+    that actually get embedded in the LLM tool catalog block at runtime
+    via ``generate_compact_prompt``. Checking the root's description
+    would be a backward-compatibility regression — it was always
+    accepted before v0.2.3 and never reaches the prompt surface.
+    Codex review on PR #5 flagged the over-broad scope.
     """
     if not isinstance(schema, dict):
         return
-    description = schema.get("description")
-    if isinstance(description, str):
-        if len(description) > MAX_PROPERTY_DESCRIPTION_LEN:
-            location = f" at {path}" if path else ""
-            errs.append(
-                f"Property description exceeds {MAX_PROPERTY_DESCRIPTION_LEN} chars "
-                f"(got {len(description)}){location}"
-            )
-        lowered = description.lower()
-        for marker in _INJECTION_PATTERNS:
-            if marker.lower() in lowered:
-                location = f" at {path}" if path else ""
-                errs.append(
-                    f"Property description contains a known prompt-injection "
-                    f"pattern ({marker!r}){location}"
-                )
-                break  # one error per description is enough; don't spam
     for key, val in schema.items():
         if key == "properties" and isinstance(val, dict):
             for pname, pdef in val.items():
-                _check_property_descriptions(pdef, errs, path=f"{path}.{pname}" if path else pname)
+                pdef_path = f"{path}.{pname}" if path else pname
+                if isinstance(pdef, dict):
+                    _check_one_description(pdef.get("description"), pdef_path, errs)
+                _check_property_descriptions(pdef, errs, path=pdef_path)
         elif key == "items" and isinstance(val, dict):
-            _check_property_descriptions(val, errs, path=f"{path}.items" if path else "items")
+            items_path = f"{path}.items" if path else "items"
+            _check_one_description(val.get("description"), items_path, errs)
+            _check_property_descriptions(val, errs, path=items_path)
         elif key in _COMPOSITION_KEYWORDS and isinstance(val, list):
             for index, branch in enumerate(val):
-                _check_property_descriptions(
-                    branch, errs, path=f"{path}.{key}[{index}]" if path else f"{key}[{index}]"
-                )
+                branch_path = f"{path}.{key}[{index}]" if path else f"{key}[{index}]"
+                if isinstance(branch, dict):
+                    _check_one_description(branch.get("description"), branch_path, errs)
+                _check_property_descriptions(branch, errs, path=branch_path)
 
 
 def _check_recursive_ref(schema: dict, errs: list[str]) -> None:

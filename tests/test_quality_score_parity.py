@@ -116,7 +116,13 @@ def test_grade_thresholds_documented_correctly() -> None:
 def test_fixture_set_covers_a_through_f_grade_range() -> None:
     """Sanity: the fixtures collectively touch enough of the grading
     spectrum to make drift-detection meaningful. We pin A, B, C, F.
-    If you add a D fixture later, append the grade letter here."""
+
+    Codex review on PR #6 noted the previous guard {A, B, F} would let
+    `low_quality.json` (the C fixture) be silently dropped or regraded
+    while this test still passed — weakening the drift-detection
+    contract. Tightened to require all four documented grades.
+    If you add a D fixture later, append "D" here in the same PR.
+    """
     expected = _load_expected()["fixtures"]
     grades = {entry["grade"] for entry in expected.values()}
-    assert grades >= {"A", "B", "F"}, f"Fixture set thinned: only covers {grades}"
+    assert grades >= {"A", "B", "C", "F"}, f"Fixture set thinned: only covers {grades}"
