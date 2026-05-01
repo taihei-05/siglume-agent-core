@@ -11,6 +11,51 @@ public API while extraction from the private monorepo is in progress.
 
 (no changes)
 
+## [0.2.3] - 2026-05-02
+
+Validator hardening release. Closes review items #7 and #8 from the
+v0.2 external audit. Forward-compatible: every legitimate publisher
+manual that passed v0.2.2 still passes; only adversarial / malformed
+schemas are newly rejected.
+
+### Added
+
+- **Property-description length cap** (`MAX_PROPERTY_DESCRIPTION_LEN
+  = 500`). Property descriptions in `input_schema` get embedded into
+  the LLM tool catalog block at runtime, so a malicious publisher
+  could otherwise plant a manual page worth of instructions there.
+  500 chars is generous enough that legitimate field documentation
+  (units, formats, examples) fits; the bar is "no manual page
+  disguised as a description".
+- **Prompt-injection pattern detection** in property descriptions.
+  29-pattern allowlist of known jailbreak / prompt-leak markers
+  ("ignore previous instructions", chat-template tokens like
+  `<|im_start|>` / `[INST]`, JA equivalents like `前の指示を無視`).
+  Conservative — substring match only, exact-marker focus, zero
+  false positives on the legitimate-publisher-copy regression set.
+- **Recursive platform-injected fields check.** `validate_input_schema`
+  previously checked only root-level `properties` for collisions with
+  `PLATFORM_INJECTED_FIELDS` (`execution_id`, `trace_id`,
+  `connected_account_id`, `dry_run`, `idempotency_key`,
+  `budget_snapshot`). v0.2.3 walks every nesting level — nested
+  object schemas, array `items`, and `oneOf`/`anyOf`/`allOf` branches
+  — so a publisher cannot smuggle `trace_id` under a nested object
+  to collide with platform-set values at runtime. Mirrors the
+  existing `_check_forbidden_key` traversal.
+
+### Notes
+
+- 14 new tests in `tests/test_validator_hardening.py` covering: at-
+  limit / over-limit length boundaries; nested + array-items
+  description checks; case-insensitive injection match;
+  Japanese-language injection; chat-template marker patterns;
+  legitimate-copy false-positive guards; recursive platform-injected
+  detection at nested / array / `oneOf` paths; non-flagged similar
+  property names.
+- Test count: 26 → 40.
+- v0.2.2's CI workflow exercises both core-only and all-extras
+  installs against this release.
+
 ## [0.2.2] - 2026-05-02
 
 Repository hygiene release. Closes review items #4, #6, #10 from the
