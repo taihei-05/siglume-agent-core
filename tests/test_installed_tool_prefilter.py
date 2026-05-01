@@ -158,6 +158,39 @@ def test_non_string_user_message_falls_back_to_prefix():
     assert [t.capability_key for t in out] == ["t_0", "t_1"]
 
 
+def test_diacritics_kept_whole_not_fragmented():
+    """v0.2.6 (codex review on PR #2): the v0.2.0 ASCII-only Latin
+    tokenizer fragmented `überweisung` into `berweisung` and dropped
+    `ü`. v0.2.6 widens the regex so non-ASCII Latin letters are
+    included in word tokens. A query containing `überweisung` must
+    now match a tool description containing the same word.
+    """
+    tools = [
+        _mk_tool(
+            capability_key="bank_transfer_de",
+            description="Bestätigte Überweisung zwischen Sparkonten",
+        ),
+        _mk_tool(capability_key="other", description="weather forecast lookup"),
+    ]
+    out = select_top_tools_for_prompt(tools, "Überweisung ausführen", max_tools=1)
+    assert len(out) == 1
+    assert out[0].capability_key == "bank_transfer_de"
+
+
+def test_diacritics_token_not_double_counted_against_cjk():
+    """The Latin tokenizer must not also match CJK characters, or those
+    would double-count against both regexes. Smoke check: a JA-only
+    query against a JA-only tool still matches via the CJK path,
+    not via accidental Latin-pattern overlap."""
+    tools = [
+        _mk_tool(capability_key="weather_jp", description="天気予報を調べる"),
+        _mk_tool(capability_key="other_en", description="weather forecast lookup"),
+    ]
+    out = select_top_tools_for_prompt(tools, "明日の天気予報を教えて", max_tools=1)
+    assert len(out) == 1
+    assert out[0].capability_key == "weather_jp"
+
+
 def test_resolved_tool_definition_dataclass_round_trip():
     """The value type is a plain dataclass — fields preserved on construction."""
     t = ResolvedToolDefinition(

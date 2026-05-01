@@ -11,6 +11,46 @@ public API while extraction from the private monorepo is in progress.
 
 (no changes)
 
+## [0.2.6] - 2026-05-02
+
+Older codex-bot review findings on PRs #1 (release.yml) and #2
+(installed_tool_prefilter) — the v0.2.5 batch only covered #4-#6, this
+release closes the rest.
+
+### Fixed
+
+- **release.yml mistag risk (P2, was in PR #1).** The Trusted
+  Publishing workflow ran on any `v*` tag without checking that the
+  pushed tag matched `project.version` in `pyproject.toml`. A mistag
+  (e.g. pushing `v0.3.0` while `pyproject.toml` was still `0.2.5`)
+  would silently publish 0.2.5 under the wrong release notes, or
+  fail later with a confusing 400 if the version was already on
+  PyPI. Added a "Verify tag matches pyproject.toml version" step
+  before `python -m build` that compares the two and aborts with
+  a remediation hint if they disagree. Belt-and-suspenders against
+  what is so far a hand-walked process.
+- **Latin tokenizer fragmented non-ASCII words (P2, was in PR #2).**
+  The v0.2.0 `installed_tool_prefilter._LATIN_TOKEN_RE` matched only
+  `[A-Za-z0-9_]`, so words with diacritics fragmented:
+  `überweisung` → `berweisung`, `tradução` → `tradu`. TF-IDF then
+  failed to match a multilingual user query against a tool whose
+  description used the same word with diacritics, forcing the
+  prefix fallback when relevance was actually high. Widened to
+  `\w` with re.UNICODE, but with a negative lookahead that excludes
+  CJK code points so the CJK matcher's bigram path does not
+  double-count Japanese / Chinese text.
+
+### Notes
+
+- Test count: 49 → 51 (+2 regression tests for diacritics and
+  CJK-vs-Latin disjointness).
+- Parity fixtures unchanged — `score_manual_quality` uses an
+  ASCII-only word extractor which is unaffected by the prefilter
+  tokenizer change.
+- All v0.2 audit findings now closed:
+  - #1 README v0.2 → v0.2.1 (partial), full reflection across releases
+  - #2-#10 → v0.2.1 / v0.2.2 / v0.2.3 / v0.2.4 / v0.2.5 / v0.2.6
+
 ## [0.2.5] - 2026-05-02
 
 Codex-bot review pass on PRs #4 / #5 / #6 (v0.2.2 / v0.2.3 / v0.2.4)
