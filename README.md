@@ -57,7 +57,16 @@ else:
         print(f"  - {s}")
 ```
 
-This is **byte-equivalent** to the server-side scorer — verified by CI parity test against the Siglume monorepo. If your local grade is B, the server grade is B.
+This is **byte-equivalent** to the server-side scorer. The Siglume monorepo's runtime depends on this PyPI package, so the same code path runs in production. You can verify the claim yourself:
+
+```bash
+pip install siglume-agent-core
+git clone https://github.com/taihei-05/siglume-agent-core
+cd siglume-agent-core
+pytest tests/test_quality_score_parity.py
+```
+
+The parity test pins `score_manual_quality` output for four representative manuals against a frozen snapshot in `tests/fixtures/expected_scores.json`. If your local grade is B, the server grade is B.
 
 ### `siglume_agent_core.installed_tool_prefilter`
 

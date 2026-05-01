@@ -1,0 +1,38 @@
+{
+  "tool_name": "weather_lookup",
+  "job_to_be_done": "Look up the current weather for a city.",
+  "summary_for_model": "Use this tool to fetch current weather data for a specified city.",
+  "trigger_conditions": [
+    "User asks about the weather.",
+    "User wants to know the temperature.",
+    "User asks if it's raining."
+  ],
+  "do_not_use_when": [
+    "User asks for a multi-day forecast."
+  ],
+  "permission_class": "read_only",
+  "dry_run_supported": false,
+  "requires_connected_accounts": [],
+  "input_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "city": {"type": "string"},
+      "country": {"type": "string"}
+    },
+    "required": ["city"]
+  },
+  "output_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "summary": {"type": "string"},
+      "temperature_c": {"type": "number"},
+      "conditions": {"type": "string"}
+    },
+    "required": ["summary"]
+  },
+  "usage_hints": ["weather", "temperature"],
+  "result_hints": ["temperature_c is in Celsius"],
+  "error_hints": ["Returns an error if the city is not recognized."]
+}

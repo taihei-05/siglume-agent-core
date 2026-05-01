@@ -1,0 +1,33 @@
+{
+  "_about": "Frozen snapshot of score_manual_quality() output for the manuals in tests/fixtures/manuals/. Pinned so external contributors can verify the README claim 'production runs the same code that's visible here' — install siglume-agent-core from PyPI, run pytest -k parity, and the snapshot must match. If a code change drifts the score, this test fails: either fix the regression, or intentionally update the snapshot in the same PR.",
+  "_pinned_at_version": "0.2.4",
+  "_grade_thresholds": {
+    "A": ">=90",
+    "B": ">=70",
+    "C": ">=50",
+    "D": ">=30",
+    "F": "<30"
+  },
+  "fixtures": {
+    "high_quality.json": {
+      "grade": "A",
+      "overall_score": 94,
+      "keyword_coverage_estimate": 43
+    },
+    "medium_quality.json": {
+      "grade": "B",
+      "overall_score": 81,
+      "keyword_coverage_estimate": 15
+    },
+    "low_quality.json": {
+      "grade": "C",
+      "overall_score": 68,
+      "keyword_coverage_estimate": 6
+    },
+    "structurally_broken.json": {
+      "grade": "F",
+      "overall_score": 20,
+      "keyword_coverage_estimate": 0
+    }
+  }
+}

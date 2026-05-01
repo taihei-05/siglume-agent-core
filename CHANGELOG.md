@@ -11,6 +11,40 @@ public API while extraction from the private monorepo is in progress.
 
 (no changes)
 
+## [0.2.4] - 2026-05-02
+
+Public parity fixture release. Closes review item #9 from the v0.2
+external audit. No code changes; new fixture set + parity test +
+README update only.
+
+### Added
+
+- `tests/fixtures/manuals/` — four representative tool manuals
+  (high / medium / low / structurally-broken quality) covering the
+  A / B / C / F grade range.
+- `tests/fixtures/expected_scores.json` — frozen snapshot pinning
+  each fixture's `grade`, `overall_score`, and
+  `keyword_coverage_estimate` from the v0.2.4 scorer.
+- `tests/test_quality_score_parity.py` — parametrized parity tests
+  asserting exact byte-equivalent output. External contributors can
+  now verify the README claim "production runs the same code that's
+  visible here" themselves: `pip install siglume-agent-core`, clone
+  this repo, `pytest tests/test_quality_score_parity.py`. The
+  Siglume monorepo's runtime depends on the same PyPI package since
+  v0.2.0, so the parity is real, not advertised.
+- README quickstart updated with the verification recipe inline.
+
+### Notes
+
+- 6 new tests in `test_quality_score_parity.py`. Test count: 40 -> 46.
+- The snapshot's `_grade_thresholds` field is cross-checked against
+  `_overall_to_grade` so the documentation cannot drift away from
+  the scorer's actual boundaries.
+- Future scorer changes that move any score must update both the
+  fixture's expected entry AND mention the user-visible behaviour
+  change in the CHANGELOG. The test message guides PR authors to
+  the right remediation.
+
 ## [0.2.3] - 2026-05-02
 
 Validator hardening release. Closes review items #7 and #8 from the
