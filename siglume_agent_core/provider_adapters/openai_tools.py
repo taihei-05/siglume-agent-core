@@ -13,7 +13,7 @@ import re
 from typing import Any
 
 import openai
-from agent_sns.application.capability_runtime.provider_adapters.types import (
+from siglume_agent_core.provider_adapters.types import (
     NormalizedToolCall,
     ProviderToolDefinition,
     ToolMessage,

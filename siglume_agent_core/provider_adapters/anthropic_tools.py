@@ -11,7 +11,7 @@ import os
 from typing import Any
 
 import anthropic
-from agent_sns.application.capability_runtime.provider_adapters.types import (
+from siglume_agent_core.provider_adapters.types import (
     NormalizedToolCall,
     ProviderToolDefinition,
     ToolMessage,
