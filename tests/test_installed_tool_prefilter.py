@@ -4,9 +4,8 @@ The prefilter is pure (no DB, no network) so these are vanilla unit tests
 constructing ResolvedToolDefinition instances directly. The platform's
 own test suite asserts byte-equivalence with this package's logic.
 """
-from __future__ import annotations
 
-from typing import Any
+from __future__ import annotations
 
 from siglume_agent_core.installed_tool_prefilter import (
     DEFAULT_MAX_TOOLS,
@@ -35,7 +34,7 @@ def _mk_tool(
         description=description,
         input_schema={},
         output_schema={},
-        permission_class="read-only",
+        permission_class="read_only",
         approval_mode="auto",
         dry_run_supported=False,
         required_connected_accounts=[],
@@ -172,7 +171,7 @@ def test_resolved_tool_definition_dataclass_round_trip():
         description="x",
         input_schema={"type": "object"},
         output_schema={"type": "object"},
-        permission_class="read-only",
+        permission_class="read_only",
         approval_mode="auto",
         dry_run_supported=False,
         required_connected_accounts=[{"provider": "x"}],

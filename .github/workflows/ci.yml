@@ -1,0 +1,72 @@
+name: CI
+
+# Triggered on every PR and on push to main. Catches the class of bugs
+# the v0.2 review surfaced (broken README example, top-level imports of
+# optional extras) before a release goes out.
+#
+# Two install matrices:
+#   - core-only (no extras): exercises the v0.2.1 lazy-import contract;
+#     `import siglume_agent_core.provider_adapters.anthropic_tools` MUST
+#     succeed even with `anthropic` absent.
+#   - all-extras: full smoke + adapter behaviour tests.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    name: pytest (${{ matrix.python-version }}, extras=${{ matrix.extras-label }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+        include:
+          - extras-label: core-only
+            extras-spec: "[dev]"
+          - extras-label: all-extras
+            extras-spec: "[dev,anthropic,openai]"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install build / runtime deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".${{ matrix.extras-spec }}"
+
+      - name: ruff lint
+        run: ruff check .
+
+      - name: ruff format check
+        run: ruff format --check .
+
+      - name: pytest
+        run: pytest -q
+
+  build:
+    name: python -m build (sdist + wheel)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build
+        run: python -m pip install --upgrade build
+
+      - name: Build distributions
+        run: python -m build
+
+      - name: List artifacts
+        run: ls -lah dist/

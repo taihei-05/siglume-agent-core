@@ -98,13 +98,9 @@ class AnthropicToolAdapter:
             return self._parse_response(response)
 
         except self._anthropic_module.APIError as exc:
-            raise RuntimeError(
-                f"Anthropic API error during tool turn: {exc}"
-            ) from exc
+            raise RuntimeError(f"Anthropic API error during tool turn: {exc}") from exc
         except Exception as exc:
-            raise RuntimeError(
-                f"Unexpected error in Anthropic tool turn: {exc}"
-            ) from exc
+            raise RuntimeError(f"Unexpected error in Anthropic tool turn: {exc}") from exc
 
     # -- internal ----------------------------------------------------------
 
@@ -127,40 +123,50 @@ class AnthropicToolAdapter:
 
             if msg.role == "tool":
                 # Tool results are sent as a user message with tool_result block
-                out.append({
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "tool_result",
-                            "tool_use_id": msg.tool_call_id,
-                            "content": msg.content,
-                        }
-                    ],
-                })
+                out.append(
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": msg.tool_call_id,
+                                "content": msg.content,
+                            }
+                        ],
+                    }
+                )
             elif msg.role == "assistant" and msg.tool_calls:
                 # Reconstruct assistant message with text + tool_use blocks
                 content_blocks: list[dict[str, Any]] = []
                 if msg.content:
-                    content_blocks.append({
-                        "type": "text",
-                        "text": msg.content,
-                    })
+                    content_blocks.append(
+                        {
+                            "type": "text",
+                            "text": msg.content,
+                        }
+                    )
                 for tc in msg.tool_calls:
-                    content_blocks.append({
-                        "type": "tool_use",
-                        "id": tc.id,
-                        "name": tc.tool_name,
-                        "input": tc.arguments,
-                    })
-                out.append({
-                    "role": "assistant",
-                    "content": content_blocks,
-                })
+                    content_blocks.append(
+                        {
+                            "type": "tool_use",
+                            "id": tc.id,
+                            "name": tc.tool_name,
+                            "input": tc.arguments,
+                        }
+                    )
+                out.append(
+                    {
+                        "role": "assistant",
+                        "content": content_blocks,
+                    }
+                )
             else:
-                out.append({
-                    "role": msg.role,
-                    "content": msg.content,
-                })
+                out.append(
+                    {
+                        "role": msg.role,
+                        "content": msg.content,
+                    }
+                )
 
         return system_text, out
 

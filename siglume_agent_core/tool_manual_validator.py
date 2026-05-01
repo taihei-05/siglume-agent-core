@@ -19,14 +19,16 @@ from typing import Any
 
 VALID_PERMISSION_CLASSES = {"read_only", "action", "payment"}
 
-PLATFORM_INJECTED_FIELDS = frozenset({
-    "execution_id",
-    "trace_id",
-    "connected_account_id",
-    "dry_run",
-    "idempotency_key",
-    "budget_snapshot",
-})
+PLATFORM_INJECTED_FIELDS = frozenset(
+    {
+        "execution_id",
+        "trace_id",
+        "connected_account_id",
+        "dry_run",
+        "idempotency_key",
+        "budget_snapshot",
+    }
+)
 
 _TOOL_NAME_RE = re.compile(r"^[A-Za-z0-9_]{3,64}$")
 _MAX_NESTED_DEPTH = 8
@@ -43,6 +45,7 @@ VALID_SETTLEMENT_MODES = {
 # ---------------------------------------------------------------------------
 # Data classes
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class ValidationError:
@@ -62,6 +65,7 @@ class ValidationResult:
 # Public API
 # ---------------------------------------------------------------------------
 
+
 def validate_tool_manual(manual: dict) -> ValidationResult:
     """Validate the complete tool manual JSON against required fields and rules."""
     errors: list[ValidationError] = []
@@ -77,11 +81,13 @@ def validate_tool_manual(manual: dict) -> ValidationResult:
     _validate_str(manual, "tool_name", 3, 64, errors)
     tool_name = manual.get("tool_name")
     if isinstance(tool_name, str) and not _TOOL_NAME_RE.match(tool_name):
-        errors.append(ValidationError(
-            "INVALID_TOOL_NAME",
-            "tool_name must be alphanumeric + underscore, 3-64 chars",
-            "tool_name",
-        ))
+        errors.append(
+            ValidationError(
+                "INVALID_TOOL_NAME",
+                "tool_name must be alphanumeric + underscore, 3-64 chars",
+                "tool_name",
+            )
+        )
 
     # -- text fields with length bounds --
     _validate_str(manual, "job_to_be_done", 10, 500, errors)
@@ -96,13 +102,17 @@ def validate_tool_manual(manual: dict) -> ValidationResult:
     # -- permission_class --
     perm = manual.get("permission_class")
     if perm is None:
-        errors.append(ValidationError("MISSING_FIELD", "permission_class is required", "permission_class"))
+        errors.append(
+            ValidationError("MISSING_FIELD", "permission_class is required", "permission_class")
+        )
     elif perm not in VALID_PERMISSION_CLASSES:
-        errors.append(ValidationError(
-            "INVALID_PERMISSION_CLASS",
-            f"permission_class must be one of {sorted(VALID_PERMISSION_CLASSES)}",
-            "permission_class",
-        ))
+        errors.append(
+            ValidationError(
+                "INVALID_PERMISSION_CLASS",
+                f"permission_class must be one of {sorted(VALID_PERMISSION_CLASSES)}",
+                "permission_class",
+            )
+        )
 
     # -- dry_run_supported --
     _validate_bool(manual, "dry_run_supported", errors)
@@ -110,16 +120,30 @@ def validate_tool_manual(manual: dict) -> ValidationResult:
     # -- requires_connected_accounts --
     rca = manual.get("requires_connected_accounts")
     if rca is None:
-        errors.append(ValidationError("MISSING_FIELD", "requires_connected_accounts is required", "requires_connected_accounts"))
+        errors.append(
+            ValidationError(
+                "MISSING_FIELD",
+                "requires_connected_accounts is required",
+                "requires_connected_accounts",
+            )
+        )
     elif not isinstance(rca, list):
-        errors.append(ValidationError("INVALID_TYPE", "requires_connected_accounts must be a list", "requires_connected_accounts"))
+        errors.append(
+            ValidationError(
+                "INVALID_TYPE",
+                "requires_connected_accounts must be a list",
+                "requires_connected_accounts",
+            )
+        )
 
     # -- input_schema --
     input_schema = manual.get("input_schema")
     if input_schema is None:
         errors.append(ValidationError("MISSING_FIELD", "input_schema is required", "input_schema"))
     elif not isinstance(input_schema, dict):
-        errors.append(ValidationError("INVALID_TYPE", "input_schema must be an object", "input_schema"))
+        errors.append(
+            ValidationError("INVALID_TYPE", "input_schema must be an object", "input_schema")
+        )
     else:
         for err_msg in validate_input_schema(input_schema):
             errors.append(ValidationError("INPUT_SCHEMA", err_msg, "input_schema"))
@@ -127,9 +151,13 @@ def validate_tool_manual(manual: dict) -> ValidationResult:
     # -- output_schema --
     output_schema = manual.get("output_schema")
     if output_schema is None:
-        errors.append(ValidationError("MISSING_FIELD", "output_schema is required", "output_schema"))
+        errors.append(
+            ValidationError("MISSING_FIELD", "output_schema is required", "output_schema")
+        )
     elif not isinstance(output_schema, dict):
-        errors.append(ValidationError("INVALID_TYPE", "output_schema must be an object", "output_schema"))
+        errors.append(
+            ValidationError("INVALID_TYPE", "output_schema must be an object", "output_schema")
+        )
     else:
         for err_msg in validate_output_schema(output_schema, permission_class=perm):
             errors.append(ValidationError("OUTPUT_SCHEMA", err_msg, "output_schema"))
@@ -140,9 +168,15 @@ def validate_tool_manual(manual: dict) -> ValidationResult:
         if val is None:
             errors.append(ValidationError("MISSING_FIELD", f"{hint_field} is required", hint_field))
         elif not isinstance(val, list):
-            errors.append(ValidationError("INVALID_TYPE", f"{hint_field} must be a list", hint_field))
+            errors.append(
+                ValidationError("INVALID_TYPE", f"{hint_field} must be a list", hint_field)
+            )
         elif not all(isinstance(item, str) for item in val):
-            errors.append(ValidationError("INVALID_TYPE", f"All items in {hint_field} must be strings", hint_field))
+            errors.append(
+                ValidationError(
+                    "INVALID_TYPE", f"All items in {hint_field} must be strings", hint_field
+                )
+            )
 
     # -- action / payment extras --
     if perm in ("action", "payment"):
@@ -151,15 +185,27 @@ def validate_tool_manual(manual: dict) -> ValidationResult:
 
         idem = manual.get("idempotency_support")
         if idem is None:
-            errors.append(ValidationError("MISSING_FIELD", "idempotency_support is required for action/payment", "idempotency_support"))
+            errors.append(
+                ValidationError(
+                    "MISSING_FIELD",
+                    "idempotency_support is required for action/payment",
+                    "idempotency_support",
+                )
+            )
         elif not isinstance(idem, bool):
-            errors.append(ValidationError("INVALID_TYPE", "idempotency_support must be a bool", "idempotency_support"))
+            errors.append(
+                ValidationError(
+                    "INVALID_TYPE", "idempotency_support must be a bool", "idempotency_support"
+                )
+            )
         elif idem is not True:
-            errors.append(ValidationError(
-                "IDEMPOTENCY_REQUIRED",
-                "idempotency_support must be true for action/payment permission class",
-                "idempotency_support",
-            ))
+            errors.append(
+                ValidationError(
+                    "IDEMPOTENCY_REQUIRED",
+                    "idempotency_support must be true for action/payment permission class",
+                    "idempotency_support",
+                )
+            )
 
         _validate_str(manual, "side_effect_summary", 1, None, errors)
 
@@ -169,19 +215,27 @@ def validate_tool_manual(manual: dict) -> ValidationResult:
 
         currency = manual.get("currency")
         if currency is None:
-            errors.append(ValidationError("MISSING_FIELD", "currency is required for payment", "currency"))
+            errors.append(
+                ValidationError("MISSING_FIELD", "currency is required for payment", "currency")
+            )
         elif currency != "USD":
             errors.append(ValidationError("INVALID_CURRENCY", "currency must be 'USD'", "currency"))
 
         sm = manual.get("settlement_mode")
         if sm is None:
-            errors.append(ValidationError("MISSING_FIELD", "settlement_mode is required for payment", "settlement_mode"))
+            errors.append(
+                ValidationError(
+                    "MISSING_FIELD", "settlement_mode is required for payment", "settlement_mode"
+                )
+            )
         elif sm not in VALID_SETTLEMENT_MODES:
-            errors.append(ValidationError(
-                "INVALID_SETTLEMENT_MODE",
-                f"settlement_mode must be one of {sorted(VALID_SETTLEMENT_MODES)}",
-                "settlement_mode",
-            ))
+            errors.append(
+                ValidationError(
+                    "INVALID_SETTLEMENT_MODE",
+                    f"settlement_mode must be one of {sorted(VALID_SETTLEMENT_MODES)}",
+                    "settlement_mode",
+                )
+            )
 
         _validate_str(manual, "refund_or_cancellation_note", 1, None, errors)
 
@@ -221,7 +275,9 @@ def validate_input_schema(schema: dict) -> list[str]:
     if isinstance(props, dict):
         for field_name in props:
             if field_name in PLATFORM_INJECTED_FIELDS:
-                errs.append(f"Property '{field_name}' is platform-injected and must not appear in input_schema")
+                errs.append(
+                    f"Property '{field_name}' is platform-injected and must not appear in input_schema"
+                )
 
     return errs
 
@@ -293,7 +349,7 @@ def generate_compact_prompt(manual: dict) -> str:
     # requires_accounts
     accounts = manual.get("requires_connected_accounts", [])
     account_labels: list[str] = []
-    for account in (accounts if isinstance(accounts, list) else []):
+    for account in accounts if isinstance(accounts, list) else []:
         if isinstance(account, dict):
             label = str(
                 account.get("provider_key")
@@ -334,6 +390,7 @@ def generate_compact_prompt(manual: dict) -> str:
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+
 def _validate_str(
     manual: dict,
     field_name: str,
@@ -349,9 +406,15 @@ def _validate_str(
         errors.append(ValidationError("INVALID_TYPE", f"{field_name} must be a string", field_name))
         return
     if len(val) < min_len:
-        errors.append(ValidationError("TOO_SHORT", f"{field_name} must be at least {min_len} chars", field_name))
+        errors.append(
+            ValidationError(
+                "TOO_SHORT", f"{field_name} must be at least {min_len} chars", field_name
+            )
+        )
     if max_len is not None and len(val) > max_len:
-        errors.append(ValidationError("TOO_LONG", f"{field_name} must be at most {max_len} chars", field_name))
+        errors.append(
+            ValidationError("TOO_LONG", f"{field_name} must be at most {max_len} chars", field_name)
+        )
 
 
 def _validate_str_list(
@@ -372,16 +435,38 @@ def _validate_str_list(
         errors.append(ValidationError("INVALID_TYPE", f"{field_name} must be a list", field_name))
         return
     if len(val) < min_items:
-        errors.append(ValidationError("TOO_FEW_ITEMS", f"{field_name} must have at least {min_items} items", field_name))
+        errors.append(
+            ValidationError(
+                "TOO_FEW_ITEMS", f"{field_name} must have at least {min_items} items", field_name
+            )
+        )
     if len(val) > max_items:
-        errors.append(ValidationError("TOO_MANY_ITEMS", f"{field_name} must have at most {max_items} items", field_name))
+        errors.append(
+            ValidationError(
+                "TOO_MANY_ITEMS", f"{field_name} must have at most {max_items} items", field_name
+            )
+        )
     for i, item in enumerate(val):
         if not isinstance(item, str):
-            errors.append(ValidationError("INVALID_TYPE", f"{field_name}[{i}] must be a string", field_name))
+            errors.append(
+                ValidationError("INVALID_TYPE", f"{field_name}[{i}] must be a string", field_name)
+            )
         elif item_min is not None and len(item) < item_min:
-            errors.append(ValidationError("ITEM_TOO_SHORT", f"{field_name}[{i}] must be at least {item_min} chars", field_name))
+            errors.append(
+                ValidationError(
+                    "ITEM_TOO_SHORT",
+                    f"{field_name}[{i}] must be at least {item_min} chars",
+                    field_name,
+                )
+            )
         elif item_max is not None and len(item) > item_max:
-            errors.append(ValidationError("ITEM_TOO_LONG", f"{field_name}[{i}] must be at most {item_max} chars", field_name))
+            errors.append(
+                ValidationError(
+                    "ITEM_TOO_LONG",
+                    f"{field_name}[{i}] must be at most {item_max} chars",
+                    field_name,
+                )
+            )
 
 
 def _validate_bool(
@@ -405,7 +490,11 @@ def _validate_json_schema_field(
     if val is None:
         errors.append(ValidationError("MISSING_FIELD", f"{field_name} is required", field_name))
     elif not isinstance(val, dict):
-        errors.append(ValidationError("INVALID_TYPE", f"{field_name} must be a JSON Schema object", field_name))
+        errors.append(
+            ValidationError(
+                "INVALID_TYPE", f"{field_name} must be a JSON Schema object", field_name
+            )
+        )
 
 
 def _check_composition_keywords(
@@ -449,7 +538,9 @@ def _check_forbidden_key(
     for key, val in schema.items():
         if key == "properties" and isinstance(val, dict):
             for pname, pdef in val.items():
-                _check_forbidden_key(pdef, forbidden, errs, path=f"{path}.{pname}" if path else pname)
+                _check_forbidden_key(
+                    pdef, forbidden, errs, path=f"{path}.{pname}" if path else pname
+                )
         elif key == "items" and isinstance(val, dict):
             _check_forbidden_key(val, forbidden, errs, path=f"{path}.items" if path else "items")
         elif key in _COMPOSITION_KEYWORDS and isinstance(val, list):
@@ -525,42 +616,176 @@ def _schema_type_label(field_def: dict) -> str:
 # ---------------------------------------------------------------------------
 
 AMBIGUOUS_PHRASES = [
-    "use when helpful", "use for productivity", "use this tool",
-    "for many tasks", "general purpose", "various uses",
-    "when needed", "as needed", "if appropriate",
-    "for convenience", "to help", "to assist",
-    "便利な時", "必要に応じて", "適宜", "いろいろな場面で",
-    "役に立つ時", "困った時",
+    "use when helpful",
+    "use for productivity",
+    "use this tool",
+    "for many tasks",
+    "general purpose",
+    "various uses",
+    "when needed",
+    "as needed",
+    "if appropriate",
+    "for convenience",
+    "to help",
+    "to assist",
+    "便利な時",
+    "必要に応じて",
+    "適宜",
+    "いろいろな場面で",
+    "役に立つ時",
+    "困った時",
 ]
 
 MARKETING_FLUFF = [
-    "ultimate", "revolutionary", "cutting-edge", "best-in-class",
-    "world-class", "game-changing", "next-generation", "powerful",
-    "amazing", "incredible", "awesome", "unbeatable",
-    "最高の", "革命的な", "画期的な", "究極の", "最強の",
+    "ultimate",
+    "revolutionary",
+    "cutting-edge",
+    "best-in-class",
+    "world-class",
+    "game-changing",
+    "next-generation",
+    "powerful",
+    "amazing",
+    "incredible",
+    "awesome",
+    "unbeatable",
+    "最高の",
+    "革命的な",
+    "画期的な",
+    "究極の",
+    "最強の",
 ]
 
-STOP_WORDS = frozenset({
-    "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
-    "have", "has", "had", "do", "does", "did", "will", "would", "shall",
-    "should", "may", "might", "must", "can", "could",
-    "i", "me", "my", "we", "our", "you", "your", "he", "she", "it",
-    "they", "them", "their", "this", "that", "these", "those",
-    "and", "but", "or", "nor", "not", "no", "so", "if", "then",
-    "than", "too", "very", "just", "also", "only",
-    "in", "on", "at", "to", "for", "of", "with", "by", "from",
-    "up", "about", "into", "through", "during", "before", "after",
-    "above", "below", "between", "out", "off", "over", "under",
-    "again", "further", "once", "here", "there", "when", "where",
-    "why", "how", "all", "each", "every", "both", "few", "more",
-    "most", "other", "some", "such", "any", "own", "same",
-    "s", "t", "don", "doesn", "didn", "won", "wouldn", "shouldn",
-    "isn", "aren", "wasn", "weren", "hasn", "haven", "hadn",
-})
+STOP_WORDS = frozenset(
+    {
+        "a",
+        "an",
+        "the",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "shall",
+        "should",
+        "may",
+        "might",
+        "must",
+        "can",
+        "could",
+        "i",
+        "me",
+        "my",
+        "we",
+        "our",
+        "you",
+        "your",
+        "he",
+        "she",
+        "it",
+        "they",
+        "them",
+        "their",
+        "this",
+        "that",
+        "these",
+        "those",
+        "and",
+        "but",
+        "or",
+        "nor",
+        "not",
+        "no",
+        "so",
+        "if",
+        "then",
+        "than",
+        "too",
+        "very",
+        "just",
+        "also",
+        "only",
+        "in",
+        "on",
+        "at",
+        "to",
+        "for",
+        "of",
+        "with",
+        "by",
+        "from",
+        "up",
+        "about",
+        "into",
+        "through",
+        "during",
+        "before",
+        "after",
+        "above",
+        "below",
+        "between",
+        "out",
+        "off",
+        "over",
+        "under",
+        "again",
+        "further",
+        "once",
+        "here",
+        "there",
+        "when",
+        "where",
+        "why",
+        "how",
+        "all",
+        "each",
+        "every",
+        "both",
+        "few",
+        "more",
+        "most",
+        "other",
+        "some",
+        "such",
+        "any",
+        "own",
+        "same",
+        "s",
+        "t",
+        "don",
+        "doesn",
+        "didn",
+        "won",
+        "wouldn",
+        "shouldn",
+        "isn",
+        "aren",
+        "wasn",
+        "weren",
+        "hasn",
+        "haven",
+        "hadn",
+    }
+)
 
 _IMPERATIVE_PREFIXES = [
-    "use this", "use the", "call this", "call the",
-    "invoke this", "run this", "execute this",
+    "use this",
+    "use the",
+    "call this",
+    "call the",
+    "invoke this",
+    "run this",
+    "execute this",
 ]
 
 _WORD_RE = re.compile(r"[A-Za-z\u3040-\u9fff]{2,}")
@@ -570,9 +795,12 @@ _WORD_RE = re.compile(r"[A-Za-z\u3040-\u9fff]{2,}")
 # Content quality scoring — data classes
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class QualityIssue:
-    category: str  # "trigger_specificity" | "description_quality" | "schema_completeness" | "ambiguity"
+    category: (
+        str  # "trigger_specificity" | "description_quality" | "schema_completeness" | "ambiguity"
+    )
     severity: str  # "critical" | "warning" | "suggestion"
     message: str
     field: str | None = None
@@ -591,6 +819,7 @@ class QualityScore:
 # ---------------------------------------------------------------------------
 # Content quality scoring — public API
 # ---------------------------------------------------------------------------
+
 
 def score_manual_quality(manual: dict) -> QualityScore:
     """Evaluate content quality of a tool manual and return actionable feedback.
@@ -611,14 +840,14 @@ def score_manual_quality(manual: dict) -> QualityScore:
     issues: list[QualityIssue] = []
 
     # -- Collect sub-scores --
-    trigger_score = _score_trigger_conditions(manual, issues)          # /30
-    do_not_use_score = _score_do_not_use_when(manual, issues)          # /10
-    summary_score = _score_summary_for_model(manual, issues)           # /10
+    trigger_score = _score_trigger_conditions(manual, issues)  # /30
+    do_not_use_score = _score_do_not_use_when(manual, issues)  # /10
+    summary_score = _score_summary_for_model(manual, issues)  # /10
     input_schema_score = _score_input_schema_descriptions(manual, issues)  # /20
     output_schema_score = _score_output_schema_completeness(manual, issues)  # /10
-    hints_score = _score_hints(manual, issues)                         # /10
+    hints_score = _score_hints(manual, issues)  # /10
     keyword_count = _estimate_keyword_coverage(manual)
-    keyword_score = _score_keyword_coverage(keyword_count)             # /10
+    keyword_score = _score_keyword_coverage(keyword_count)  # /10
 
     overall = (
         trigger_score
@@ -634,9 +863,15 @@ def score_manual_quality(manual: dict) -> QualityScore:
     grade = _overall_to_grade(overall)
 
     suggestions = _build_improvement_suggestions(
-        overall, trigger_score, do_not_use_score, summary_score,
-        input_schema_score, output_schema_score, hints_score,
-        keyword_count, issues,
+        overall,
+        trigger_score,
+        do_not_use_score,
+        summary_score,
+        input_schema_score,
+        output_schema_score,
+        hints_score,
+        keyword_count,
+        issues,
     )
 
     return QualityScore(
@@ -652,15 +887,19 @@ def score_manual_quality(manual: dict) -> QualityScore:
 # Content quality scoring — sub-scorers
 # ---------------------------------------------------------------------------
 
+
 def _score_trigger_conditions(manual: dict, issues: list[QualityIssue]) -> int:
     """Score trigger_conditions quality (max 30 points)."""
     conditions = manual.get("trigger_conditions")
     if not isinstance(conditions, list) or len(conditions) == 0:
-        issues.append(QualityIssue(
-            "trigger_specificity", "critical",
-            "No trigger_conditions provided",
-            field="trigger_conditions",
-        ))
+        issues.append(
+            QualityIssue(
+                "trigger_specificity",
+                "critical",
+                "No trigger_conditions provided",
+                field="trigger_conditions",
+            )
+        )
         return 0
 
     score = 30
@@ -673,58 +912,73 @@ def _score_trigger_conditions(manual: dict, issues: list[QualityIssue]) -> int:
 
         # Length check
         if len(cond) < 15:
-            issues.append(QualityIssue(
-                "trigger_specificity", "warning",
-                f"Trigger condition is too short ({len(cond)} chars) — be more specific",
-                field=field_ref,
-                suggestion="Describe a concrete situation, e.g. 'When the owner asks for a weather forecast for a specific city'",
-            ))
+            issues.append(
+                QualityIssue(
+                    "trigger_specificity",
+                    "warning",
+                    f"Trigger condition is too short ({len(cond)} chars) — be more specific",
+                    field=field_ref,
+                    suggestion="Describe a concrete situation, e.g. 'When the owner asks for a weather forecast for a specific city'",
+                )
+            )
             score -= penalty_per_issue
 
         # Ambiguous phrase check
         cond_lower = cond.lower()
         for phrase in AMBIGUOUS_PHRASES:
             if phrase.lower() in cond_lower:
-                issues.append(QualityIssue(
-                    "ambiguity", "warning",
-                    f"Contains vague phrase '{phrase}' — agents cannot reliably match on this",
-                    field=field_ref,
-                    suggestion="Replace with a concrete situation description",
-                ))
+                issues.append(
+                    QualityIssue(
+                        "ambiguity",
+                        "warning",
+                        f"Contains vague phrase '{phrase}' — agents cannot reliably match on this",
+                        field=field_ref,
+                        suggestion="Replace with a concrete situation description",
+                    )
+                )
                 score -= penalty_per_issue
                 break  # one penalty per condition for ambiguity
 
         # Marketing fluff in triggers
         for fluff in MARKETING_FLUFF:
             if fluff.lower() in cond_lower:
-                issues.append(QualityIssue(
-                    "description_quality", "warning",
-                    f"Marketing language '{fluff}' in trigger condition reduces selection accuracy",
-                    field=field_ref,
-                    suggestion="Use factual, situation-based language instead",
-                ))
+                issues.append(
+                    QualityIssue(
+                        "description_quality",
+                        "warning",
+                        f"Marketing language '{fluff}' in trigger condition reduces selection accuracy",
+                        field=field_ref,
+                        suggestion="Use factual, situation-based language instead",
+                    )
+                )
                 score -= 3
                 break
 
         # Imperative check — triggers should describe situations, not commands
         for prefix in _IMPERATIVE_PREFIXES:
             if cond_lower.startswith(prefix):
-                issues.append(QualityIssue(
-                    "trigger_specificity", "suggestion",
-                    "Trigger reads as an imperative command rather than a situation description",
-                    field=field_ref,
-                    suggestion="Rewrite as a situation: 'When the user needs...' or 'The agent encounters...'",
-                ))
+                issues.append(
+                    QualityIssue(
+                        "trigger_specificity",
+                        "suggestion",
+                        "Trigger reads as an imperative command rather than a situation description",
+                        field=field_ref,
+                        suggestion="Rewrite as a situation: 'When the user needs...' or 'The agent encounters...'",
+                    )
+                )
                 score -= 2
                 break
 
     # Variety bonus: penalize if fewer than 3 conditions
     if len(conditions) < 3:
-        issues.append(QualityIssue(
-            "trigger_specificity", "suggestion",
-            f"Only {len(conditions)} trigger condition(s) — 3+ increases selection chances",
-            field="trigger_conditions",
-        ))
+        issues.append(
+            QualityIssue(
+                "trigger_specificity",
+                "suggestion",
+                f"Only {len(conditions)} trigger condition(s) — 3+ increases selection chances",
+                field="trigger_conditions",
+            )
+        )
         score -= 5
 
     return max(0, score)
@@ -734,11 +988,14 @@ def _score_do_not_use_when(manual: dict, issues: list[QualityIssue]) -> int:
     """Score do_not_use_when quality (max 10 points)."""
     items = manual.get("do_not_use_when")
     if not isinstance(items, list) or len(items) == 0:
-        issues.append(QualityIssue(
-            "description_quality", "warning",
-            "No do_not_use_when items — agents need negative conditions to avoid false positives",
-            field="do_not_use_when",
-        ))
+        issues.append(
+            QualityIssue(
+                "description_quality",
+                "warning",
+                "No do_not_use_when items — agents need negative conditions to avoid false positives",
+                field="do_not_use_when",
+            )
+        )
         return 0
 
     score = 10
@@ -759,21 +1016,27 @@ def _score_do_not_use_when(manual: dict, issues: list[QualityIssue]) -> int:
             if item_words and trigger_words:
                 overlap = len(item_words & trigger_words) / max(len(item_words), 1)
                 if overlap > 0.6:
-                    issues.append(QualityIssue(
-                        "ambiguity", "suggestion",
-                        "This do_not_use_when item closely mirrors a trigger_condition — add a genuinely different negative case",
-                        field=field_ref,
-                    ))
+                    issues.append(
+                        QualityIssue(
+                            "ambiguity",
+                            "suggestion",
+                            "This do_not_use_when item closely mirrors a trigger_condition — add a genuinely different negative case",
+                            field=field_ref,
+                        )
+                    )
                     score -= 3
                     break
 
         # Check for vague negatives
         if len(item) < 10:
-            issues.append(QualityIssue(
-                "description_quality", "suggestion",
-                "do_not_use_when item is very short — describe a concrete negative condition",
-                field=field_ref,
-            ))
+            issues.append(
+                QualityIssue(
+                    "description_quality",
+                    "suggestion",
+                    "do_not_use_when item is very short — describe a concrete negative condition",
+                    field=field_ref,
+                )
+            )
             score -= 2
 
     return max(0, score)
@@ -792,23 +1055,29 @@ def _score_summary_for_model(manual: dict, issues: list[QualityIssue]) -> int:
     fluff_found = False
     for fluff in MARKETING_FLUFF:
         if fluff.lower() in summary_lower:
-            issues.append(QualityIssue(
-                "description_quality", "warning",
-                f"Marketing language '{fluff}' in summary_for_model — agents ignore hype, use factual descriptions",
-                field="summary_for_model",
-                suggestion="Describe what the tool actually does in plain terms",
-            ))
+            issues.append(
+                QualityIssue(
+                    "description_quality",
+                    "warning",
+                    f"Marketing language '{fluff}' in summary_for_model — agents ignore hype, use factual descriptions",
+                    field="summary_for_model",
+                    suggestion="Describe what the tool actually does in plain terms",
+                )
+            )
             if not fluff_found:
                 score -= 3
                 fluff_found = True
 
     # Too short to be useful
     if len(summary) < 20:
-        issues.append(QualityIssue(
-            "description_quality", "suggestion",
-            "summary_for_model is very brief — a longer factual description helps agent selection",
-            field="summary_for_model",
-        ))
+        issues.append(
+            QualityIssue(
+                "description_quality",
+                "suggestion",
+                "summary_for_model is very brief — a longer factual description helps agent selection",
+                field="summary_for_model",
+            )
+        )
         score -= 3
 
     return max(0, score)
@@ -849,11 +1118,14 @@ def _score_output_schema_completeness(manual: dict, issues: list[QualityIssue]) 
         return 2
 
     if len(props) == 0:
-        issues.append(QualityIssue(
-            "schema_completeness", "warning",
-            "output_schema has no properties defined",
-            field="output_schema",
-        ))
+        issues.append(
+            QualityIssue(
+                "schema_completeness",
+                "warning",
+                "output_schema has no properties defined",
+                field="output_schema",
+            )
+        )
         return 0
 
     # Check that output properties have descriptions
@@ -863,12 +1135,15 @@ def _score_output_schema_completeness(manual: dict, issues: list[QualityIssue]) 
             undescribed += 1
 
     if undescribed > 0:
-        issues.append(QualityIssue(
-            "schema_completeness", "suggestion",
-            f"{undescribed} output field(s) lack descriptions",
-            field="output_schema",
-            suggestion="Add description to each output property so agents know what to expect",
-        ))
+        issues.append(
+            QualityIssue(
+                "schema_completeness",
+                "suggestion",
+                f"{undescribed} output field(s) lack descriptions",
+                field="output_schema",
+                suggestion="Add description to each output property so agents know what to expect",
+            )
+        )
         score -= min(undescribed * 2, 6)
 
     return max(0, score)
@@ -884,20 +1159,26 @@ def _score_hints(manual: dict, issues: list[QualityIssue]) -> int:
             score -= 5
             continue
         if len(hints) == 0:
-            issues.append(QualityIssue(
-                "description_quality", "suggestion",
-                f"{hint_field} is empty — hints help agents use the tool correctly",
-                field=hint_field,
-            ))
+            issues.append(
+                QualityIssue(
+                    "description_quality",
+                    "suggestion",
+                    f"{hint_field} is empty — hints help agents use the tool correctly",
+                    field=hint_field,
+                )
+            )
             score -= 3
         else:
             short_count = sum(1 for h in hints if isinstance(h, str) and len(h) < 10)
             if short_count > 0:
-                issues.append(QualityIssue(
-                    "description_quality", "suggestion",
-                    f"{short_count} item(s) in {hint_field} are very short — provide actionable guidance",
-                    field=hint_field,
-                ))
+                issues.append(
+                    QualityIssue(
+                        "description_quality",
+                        "suggestion",
+                        f"{short_count} item(s) in {hint_field} are very short — provide actionable guidance",
+                        field=hint_field,
+                    )
+                )
                 score -= min(short_count * 1, 3)
 
     return max(0, score)
@@ -920,6 +1201,7 @@ def _score_keyword_coverage(keyword_count: int) -> int:
 # Content quality scoring — helpers
 # ---------------------------------------------------------------------------
 
+
 def _check_schema_descriptions(schema: dict) -> list[QualityIssue]:
     """Check that input_schema properties have adequate descriptions."""
     issues: list[QualityIssue] = []
@@ -935,31 +1217,40 @@ def _check_schema_descriptions(schema: dict) -> list[QualityIssue]:
         desc = pdef.get("description")
 
         if desc is None or (isinstance(desc, str) and len(desc.strip()) == 0):
-            issues.append(QualityIssue(
-                "schema_completeness", "warning",
-                f"Field '{pname}' has no description — agents will not know what to pass",
-                field=field_ref,
-                suggestion=f"Add a description explaining what '{pname}' represents and any constraints",
-            ))
+            issues.append(
+                QualityIssue(
+                    "schema_completeness",
+                    "warning",
+                    f"Field '{pname}' has no description — agents will not know what to pass",
+                    field=field_ref,
+                    suggestion=f"Add a description explaining what '{pname}' represents and any constraints",
+                )
+            )
         elif isinstance(desc, str) and len(desc.strip()) < 10:
-            issues.append(QualityIssue(
-                "schema_completeness", "suggestion",
-                f"Field '{pname}' has a very short description ({len(desc.strip())} chars)",
-                field=field_ref,
-                suggestion="Expand the description to at least 10 characters for clarity",
-            ))
+            issues.append(
+                QualityIssue(
+                    "schema_completeness",
+                    "suggestion",
+                    f"Field '{pname}' has a very short description ({len(desc.strip())} chars)",
+                    field=field_ref,
+                    suggestion="Expand the description to at least 10 characters for clarity",
+                )
+            )
 
         # Check enum values for meaningfulness
         enum_vals = pdef.get("enum")
         if isinstance(enum_vals, list):
             trivial = [v for v in enum_vals if isinstance(v, str) and len(v) <= 1]
             if len(trivial) > 0 and len(trivial) == len(enum_vals):
-                issues.append(QualityIssue(
-                    "schema_completeness", "warning",
-                    f"Field '{pname}' has only single-character enum values — use meaningful names",
-                    field=field_ref,
-                    suggestion="Replace enum values like 'a','b','c' with descriptive names like 'celsius','fahrenheit'",
-                ))
+                issues.append(
+                    QualityIssue(
+                        "schema_completeness",
+                        "warning",
+                        f"Field '{pname}' has only single-character enum values — use meaningful names",
+                        field=field_ref,
+                        suggestion="Replace enum values like 'a','b','c' with descriptive names like 'celsius','fahrenheit'",
+                    )
+                )
 
         # Recurse into nested objects
         if pdef.get("type") == "object":
