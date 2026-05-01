@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "siglume-agent-core"
+version = "0.1.0"
+description = "Open-core orchestrator logic for the Siglume API Store agent runtime — tool-manual quality scoring + LLM provider tool adapters."
+readme = "README.md"
+license = { text = "AGPL-3.0-only" }
+requires-python = ">=3.11"
+authors = [{ name = "Siglume", email = "siglume@energy-connect.co.jp" }]
+keywords = [
+  "siglume",
+  "agent",
+  "tool-use",
+  "llm",
+  "marketplace",
+  "orchestrator",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: GNU Affero General Public License v3",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = []
+
+[project.optional-dependencies]
+anthropic = ["anthropic>=0.40.0"]
+openai = ["openai>=1.50.0"]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.5",
+]
+
+[project.urls]
+Homepage = "https://github.com/taihei-05/siglume-agent-core"
+Repository = "https://github.com/taihei-05/siglume-agent-core"
+Issues = "https://github.com/taihei-05/siglume-agent-core/issues"
+"API Store Tracking Issue" = "https://github.com/taihei-05/siglume-api-sdk/issues/195"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["orchestrator_core*"]
+exclude = ["tests*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP"]
+ignore = ["E501"]
