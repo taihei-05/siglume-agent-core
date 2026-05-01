@@ -4,7 +4,7 @@ Tier A (v0.1):
 - ``tool_manual_validator``: grade publisher manuals A-F (same as the platform).
 - ``provider_adapters``: Anthropic / OpenAI tool-use adapters.
 
-Tier B (v0.2, this release):
+Tier B Phase 1 (v0.2):
 - ``installed_tool_prefilter``: TF-IDF + cosine similarity ranking that picks
   the top-N most-relevant tools when an agent is bound to many. Pure-Python,
   no external embedding service. Used by the platform to keep the chat
@@ -12,7 +12,18 @@ Tier B (v0.2, this release):
 - ``types.ResolvedToolDefinition``: the value-shape used by prefilter (and
   future Tier B modules). Mirrors the platform's resolver output.
 
+Tier B Phase 2 (v0.3, this release):
+- ``tool_selector``: dispatch-time keyword scorer. Runs after the prefilter
+  trims the catalog: filters out tools with missing connected accounts
+  (when their permission_class requires one), scores the remainder against
+  the user request, and returns the top-K (default 5) in score order.
+  Surfaces "no useful match" gap signals via an ``on_unmatched`` callback
+  so the caller can persist them however it wants — agent-core stays
+  pure (no DB / no SAVEPOINT). Companion utility
+  ``strip_long_alphanumeric_secrets`` is exposed publicly for callers
+  composing their own request-text redactor.
+
 See ARCHITECTURE.md for the staged extraction roadmap.
 """
 
-__version__ = "0.2.6"
+__version__ = "0.3.0"
