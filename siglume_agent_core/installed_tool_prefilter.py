@@ -22,11 +22,12 @@ Out of scope for v1:
     Those become useful once telemetry on which tools the LLM actually
     picks under the new pre-filter is available.
 """
+
 from __future__ import annotations
 
 import math
 import re
-from typing import Iterable, Sequence
+from collections.abc import Iterable, Sequence
 
 from .types import ResolvedToolDefinition
 
@@ -61,7 +62,7 @@ def _tokenize(text: str) -> list[str]:
             tokens.append(run)
             continue
         for i in range(len(run) - 1):
-            tokens.append(run[i:i + 2])
+            tokens.append(run[i : i + 2])
     return tokens
 
 
@@ -104,10 +105,7 @@ def _smoothed_idf(doc_token_sets: Iterable[set[str]], n_docs: int) -> dict[str, 
     for token_set in doc_token_sets:
         for token in token_set:
             df[token] = df.get(token, 0) + 1
-    return {
-        token: math.log((n_docs + 1) / (count + 1)) + 1.0
-        for token, count in df.items()
-    }
+    return {token: math.log((n_docs + 1) / (count + 1)) + 1.0 for token, count in df.items()}
 
 
 def _tfidf_vector(

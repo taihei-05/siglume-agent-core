@@ -11,6 +11,46 @@ public API while extraction from the private monorepo is in progress.
 
 (no changes)
 
+## [0.2.2] - 2026-05-02
+
+Repository hygiene release. Closes review items #4, #6, #10 from the
+v0.2 external audit. No behavior changes; type tightening only.
+
+### Added
+
+- **`SECURITY.md`** — vulnerability disclosure policy. Reports go to
+  `siglume@energy-connect.co.jp`. Acknowledgement within 3 business
+  days, remediation plan within 14 calendar days for confirmed
+  issues. Scope limited to this package; out-of-scope reports
+  forwarded.
+- **`.github/workflows/ci.yml`** — pytest + ruff (lint + format check)
+  + sdist/wheel build on every PR and push to `main`. Runs against a
+  matrix of `(Python 3.11 / 3.12) × (core-only / all-extras)` so the
+  v0.2.1 lazy-import contract is verified on each change. Catches the
+  class of bug v0.2.1 fixed (broken README example, top-level imports
+  of optional extras) before a release goes out.
+- **`PermissionClass` and `AccountReadiness` typed `Literal` aliases**
+  in `siglume_agent_core.types`. Replaces the previous `str` typing on
+  `ResolvedToolDefinition.permission_class` / `.account_readiness`,
+  preventing the historical `read-only` (hyphen) / `read_only`
+  (underscore) drift from re-occurring. The underscore form
+  (`read_only`) is canonical, matching `tool_manual_validator`'s
+  `VALID_PERMISSION_CLASSES` set.
+
+### Fixed
+
+- **Test inconsistency**: `tests/test_installed_tool_prefilter.py`
+  used `permission_class="read-only"` (hyphen) while the validator
+  accepts only `"read_only"` (underscore). Tests now use the
+  canonical underscore form.
+
+### Notes
+
+- New regression tests pin `PermissionClass` against
+  `VALID_PERMISSION_CLASSES` so future drift fails CI immediately
+  instead of slipping through to a downstream submission.
+- Test count: 24 → 26.
+
 ## [0.2.1] - 2026-05-02
 
 Bugfix release addressing three findings from external review of the v0.2

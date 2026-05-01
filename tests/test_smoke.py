@@ -5,12 +5,14 @@ End-to-end behavior tests live alongside each module's logic and are exercised
 by the parity test suite in the Siglume monorepo (which asserts byte-equivalence
 between the monorepo's local copy and this package).
 """
+
 from __future__ import annotations
 
 
 def test_package_version_present():
     import siglume_agent_core
-    assert siglume_agent_core.__version__ == "0.2.1"
+
+    assert siglume_agent_core.__version__ == "0.2.2"
 
 
 def test_tool_manual_validator_imports():
@@ -18,6 +20,7 @@ def test_tool_manual_validator_imports():
         score_manual_quality,
         validate_tool_manual,
     )
+
     assert callable(validate_tool_manual)
     assert callable(score_manual_quality)
 
@@ -76,9 +79,37 @@ def test_score_manual_quality_returns_grade():
 
 def test_provider_adapter_types_import():
     from siglume_agent_core.provider_adapters.types import ToolMessage
+
     msg = ToolMessage(role="user", content="hello")
     assert msg.role == "user"
     assert msg.content == "hello"
+
+
+def test_permission_class_literal_matches_validator():
+    """The PermissionClass Literal in types.py must stay in lockstep with
+    VALID_PERMISSION_CLASSES in tool_manual_validator. If a future change
+    adds a new permission_class to one and forgets the other, this test
+    fails so the drift is caught at CI rather than at submission time.
+    """
+    import typing
+
+    from siglume_agent_core.tool_manual_validator import VALID_PERMISSION_CLASSES
+    from siglume_agent_core.types import PermissionClass
+
+    literal_values = set(typing.get_args(PermissionClass))
+    assert literal_values == VALID_PERMISSION_CLASSES, (
+        f"PermissionClass Literal drifted from validator: "
+        f"{literal_values} vs {VALID_PERMISSION_CLASSES}"
+    )
+
+
+def test_account_readiness_literal_values():
+    """Pins the documented set of account_readiness values."""
+    import typing
+
+    from siglume_agent_core.types import AccountReadiness
+
+    assert set(typing.get_args(AccountReadiness)) == {"ready", "missing", "unhealthy"}
 
 
 def test_anthropic_adapter_imports_without_sdk():
@@ -111,6 +142,7 @@ def test_anthropic_adapter_constructor_raises_actionable_error_without_sdk(monke
 
     monkeypatch.setattr(anthropic_tools, "_require_anthropic", _fake_require_anthropic)
     import pytest
+
     with pytest.raises(ImportError) as exc_info:
         anthropic_tools.AnthropicToolAdapter(api_key="dummy")
     assert "siglume-agent-core[anthropic]" in str(exc_info.value)
@@ -128,6 +160,7 @@ def test_openai_adapter_constructor_raises_actionable_error_without_sdk(monkeypa
 
     monkeypatch.setattr(openai_tools, "_require_openai", _fake_require_openai)
     import pytest
+
     with pytest.raises(ImportError) as exc_info:
         openai_tools.OpenAIToolAdapter(api_key="dummy")
     assert "siglume-agent-core[openai]" in str(exc_info.value)
@@ -140,6 +173,7 @@ def test_anthropic_adapter_tool_choice_none_elides_tools(monkeypatch):
     disable. Critical when action / payment-class tools share the
     adapter."""
     import pytest
+
     pytest.importorskip("anthropic")
 
     from siglume_agent_core.provider_adapters import anthropic_tools
@@ -153,11 +187,14 @@ def test_anthropic_adapter_tool_choice_none_elides_tools(monkeypatch):
     class _FakeMessages:
         def create(self, **kwargs):
             captured.update(kwargs)
+
             class _Resp:
                 content = []
                 stop_reason = "end_turn"
+
                 def model_dump(self_inner):
                     return {}
+
             return _Resp()
 
     class _FakeClient:
@@ -169,13 +206,12 @@ def test_anthropic_adapter_tool_choice_none_elides_tools(monkeypatch):
 
     class _FakeAnthropicModule:
         APIError = _FakeAPIError
+
         @staticmethod
         def Anthropic(*a, **kw):
             return _FakeClient()
 
-    monkeypatch.setattr(
-        anthropic_tools, "_require_anthropic", lambda: _FakeAnthropicModule
-    )
+    monkeypatch.setattr(anthropic_tools, "_require_anthropic", lambda: _FakeAnthropicModule)
     adapter = anthropic_tools.AnthropicToolAdapter(api_key="dummy")
     adapter.run_turn(
         model="claude-haiku-4-5-20251001",
@@ -202,6 +238,7 @@ def test_anthropic_adapter_tool_choice_auto_passes_tools(monkeypatch):
     """Sanity counter-test: tool_choice='auto' MUST send tools so the
     elision in the 'none' case is genuinely conditional, not a regression."""
     import pytest
+
     pytest.importorskip("anthropic")
 
     from siglume_agent_core.provider_adapters import anthropic_tools
@@ -215,11 +252,14 @@ def test_anthropic_adapter_tool_choice_auto_passes_tools(monkeypatch):
     class _FakeMessages:
         def create(self, **kwargs):
             captured.update(kwargs)
+
             class _Resp:
                 content = []
                 stop_reason = "end_turn"
+
                 def model_dump(self_inner):
                     return {}
+
             return _Resp()
 
     class _FakeClient:
@@ -231,13 +271,12 @@ def test_anthropic_adapter_tool_choice_auto_passes_tools(monkeypatch):
 
     class _FakeAnthropicModule:
         APIError = _FakeAPIError
+
         @staticmethod
         def Anthropic(*a, **kw):
             return _FakeClient()
 
-    monkeypatch.setattr(
-        anthropic_tools, "_require_anthropic", lambda: _FakeAnthropicModule
-    )
+    monkeypatch.setattr(anthropic_tools, "_require_anthropic", lambda: _FakeAnthropicModule)
     adapter = anthropic_tools.AnthropicToolAdapter(api_key="dummy")
     adapter.run_turn(
         model="claude-haiku-4-5-20251001",

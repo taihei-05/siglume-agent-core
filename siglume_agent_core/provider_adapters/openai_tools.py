@@ -39,6 +39,7 @@ def _require_openai() -> Any:
         ) from exc
     return openai
 
+
 # OpenAI reasoning / GPT-5 model families reject the legacy ``max_tokens``
 # request kwarg with HTTP 400 ``"Use 'max_completion_tokens'"``. The 2026-04
 # stress test (119 skills bound to demo agent) hit this for every tool turn
@@ -54,14 +55,10 @@ def _require_openai() -> Any:
 # false-matching a hypothetical future non-reasoning ``o10`` / ``o30``
 # family. ``o4`` and beyond fall through to the unknown-model default
 # (``max_completion_tokens``) which is the safe forward direction.
-_REASONING_MODEL_FAMILY_PREFIX_RE = re.compile(
-    r"^(?:gpt-5|o1|o3)(?:[-.o]|$)", re.IGNORECASE
-)
+_REASONING_MODEL_FAMILY_PREFIX_RE = re.compile(r"^(?:gpt-5|o1|o3)(?:[-.o]|$)", re.IGNORECASE)
 
 
-def _max_output_tokens_kwarg_for_model(
-    model: str, max_output_tokens: int
-) -> dict[str, int]:
+def _max_output_tokens_kwarg_for_model(model: str, max_output_tokens: int) -> dict[str, int]:
     """Return the correct token-cap kwarg for ``model``.
 
     GPT-5 / o1 / o3 reasoning families require ``max_completion_tokens``.
@@ -81,6 +78,7 @@ def _max_output_tokens_kwarg_for_model(
 # ---------------------------------------------------------------------------
 # Adapter
 # ---------------------------------------------------------------------------
+
 
 class OpenAIToolAdapter:
     """Wraps the OpenAI chat-completions API for tool-augmented turns."""
@@ -122,13 +120,9 @@ class OpenAIToolAdapter:
             return self._parse_response(response)
 
         except self._openai_module.APIError as exc:
-            raise RuntimeError(
-                f"OpenAI API error during tool turn: {exc}"
-            ) from exc
+            raise RuntimeError(f"OpenAI API error during tool turn: {exc}") from exc
         except Exception as exc:
-            raise RuntimeError(
-                f"Unexpected error in OpenAI tool turn: {exc}"
-            ) from exc
+            raise RuntimeError(f"Unexpected error in OpenAI tool turn: {exc}") from exc
 
     # -- internal ----------------------------------------------------------
 
@@ -137,11 +131,13 @@ class OpenAIToolAdapter:
         out: list[dict[str, Any]] = []
         for msg in messages:
             if msg.role == "tool":
-                out.append({
-                    "role": "tool",
-                    "tool_call_id": msg.tool_call_id,
-                    "content": msg.content,
-                })
+                out.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": msg.tool_call_id,
+                        "content": msg.content,
+                    }
+                )
             elif msg.role == "assistant" and msg.tool_calls:
                 tc_list = [
                     {
@@ -154,16 +150,20 @@ class OpenAIToolAdapter:
                     }
                     for tc in msg.tool_calls
                 ]
-                out.append({
-                    "role": "assistant",
-                    "content": msg.content or None,
-                    "tool_calls": tc_list,
-                })
+                out.append(
+                    {
+                        "role": "assistant",
+                        "content": msg.content or None,
+                        "tool_calls": tc_list,
+                    }
+                )
             else:
-                out.append({
-                    "role": msg.role,
-                    "content": msg.content,
-                })
+                out.append(
+                    {
+                        "role": msg.role,
+                        "content": msg.content,
+                    }
+                )
         return out
 
     @staticmethod

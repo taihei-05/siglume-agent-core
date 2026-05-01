@@ -4,10 +4,24 @@ Lives apart from any specific orchestration module so multiple modules
 (prefilter, future resolver/selector) can refer to the same shape without
 circular imports. These are pure dataclasses — no DB, no I/O.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
+
+# Canonical permission_class values. The validator (tool_manual_validator)
+# ALSO authoritatively gates these three at submission time; this Literal
+# keeps the public dataclass and the validator in lockstep. The underscore
+# form ("read_only", not "read-only") is the canonical platform spelling
+# — historical drift in this repo's tests and downstream code that used
+# the hyphenated form was a representation bug fixed in v0.2.2.
+PermissionClass = Literal["read_only", "action", "payment"]
+
+# Canonical account_readiness values. The platform sets one of these
+# strictly; consumers can switch on this without worrying about
+# unexpected casing or alternate spellings.
+AccountReadiness = Literal["ready", "missing", "unhealthy"]
 
 
 @dataclass
@@ -31,11 +45,11 @@ class ResolvedToolDefinition:
     description: str
     input_schema: dict[str, Any]
     output_schema: dict[str, Any]
-    permission_class: str
+    permission_class: PermissionClass
     approval_mode: str
     dry_run_supported: bool
     required_connected_accounts: list[dict[str, Any]]
-    account_readiness: str  # "ready" | "missing" | "unhealthy"
+    account_readiness: AccountReadiness
     usage_hints: list[str] = field(default_factory=list)
     result_hints: list[str] = field(default_factory=list)
     cost_hint_usd_cents: int | None = None
@@ -47,4 +61,8 @@ class ResolvedToolDefinition:
     execution_adapter_config: dict[str, Any] = field(default_factory=dict)
 
 
-__all__ = ["ResolvedToolDefinition"]
+__all__ = [
+    "AccountReadiness",
+    "PermissionClass",
+    "ResolvedToolDefinition",
+]
