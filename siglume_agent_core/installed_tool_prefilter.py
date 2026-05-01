@@ -37,8 +37,20 @@ from .types import ResolvedToolDefinition
 # tokens for the catalog block). Callers can override per-request.
 DEFAULT_MAX_TOOLS = 50
 
-# Latin words: 2+ word characters in a row, ASCII or Unicode letter.
-_LATIN_TOKEN_RE = re.compile(r"[A-Za-z0-9_]{2,}", re.UNICODE)
+# Word tokens for non-CJK scripts: 2+ "word" characters EXCLUDING the
+# CJK ranges (which a separate matcher handles into bigrams below).
+# Python's `\w` with re.UNICODE matches letters in every script
+# including CJK ideographs, so a naïve `\w{2,}` would double-count
+# JA / ZH text against both this regex and `_CJK_RE`. The negative
+# lookahead before each `\w` ensures we only consume characters
+# outside the CJK blocks. Net effect:
+#   "überweisung"  → one whole token (was "berweisung" pre-v0.2.6)
+#   "天気予報"        → no Latin match, fully handled by _CJK_RE
+#   "Hello 天気"     → "hello" + CJK bigrams, no overlap
+# Codex review on PR #2 surfaced the original ASCII-only fragmentation;
+# the v0.2.6 widening keeps non-ASCII Latin words whole while staying
+# disjoint from the CJK matcher.
+_LATIN_TOKEN_RE = re.compile(r"(?:(?![぀-ゟ゠-ヿ一-鿿])\w){2,}", re.UNICODE)
 # CJK code-point ranges: Hiragana, Katakana, CJK Unified Ideographs (the
 # blocks Siglume actually sees in JA prompts). Tokens become character
 # bigrams from contiguous runs.
