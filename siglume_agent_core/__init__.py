@@ -15,4 +15,4 @@ Tier B (v0.2, this release):
 See ARCHITECTURE.md for the staged extraction roadmap.
 """
 
-__version__ = "0.2.4"
+__version__ = "0.2.5"

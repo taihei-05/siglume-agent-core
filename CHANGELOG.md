@@ -11,6 +11,52 @@ public API while extraction from the private monorepo is in progress.
 
 (no changes)
 
+## [0.2.5] - 2026-05-02
+
+Codex-bot review pass on PRs #4 / #5 / #6 (v0.2.2 / v0.2.3 / v0.2.4)
+flagged four real issues. All four are fixed in this release.
+
+### Fixed
+
+- **CI matrix bug (P1, was in v0.2.2).** `.github/workflows/ci.yml`
+  declared `python-version` as a matrix dimension and listed extras
+  via `matrix.include`. Per GitHub Actions semantics each `include`
+  entry merges into existing combinations and a later `include` with
+  the same shape overwrites earlier ones — so both extras entries
+  collapsed onto the same `python-version` combinations and the
+  second (`all-extras`) overwrote the first (`core-only`). Net
+  effect: the core-only install was never exercised, defeating the
+  whole point of the v0.2.1 lazy-import contract verification.
+  Switched to two real matrix dimensions
+  (`python-version × extras`) so the four-job matrix actually runs.
+- **Injection blacklist false-positive (P1, was in v0.2.3).** The
+  marker `"act as if"` is too common in legitimate technical copy
+  ("if omitted, treat as if value is 0") to remain in a
+  hard-rejection list. Removed; other 28 markers retained.
+- **Description check over-broad (P2, was in v0.2.3).**
+  `_check_property_descriptions` walked the schema starting from the
+  root and checked every node's `description` — including the root
+  `input_schema.description`, which is not a property description
+  and never reaches the LLM tool catalog block. A long or
+  marker-containing root description that was always accepted before
+  v0.2.3 would now fail validation, a backward-compat regression.
+  Refactored: the helper now only checks descriptions on actual
+  properties, array `items` schemas, and composition-branch schemas
+  (`oneOf` / `anyOf` / `allOf` entries). Root description is left
+  alone, restoring v0.2.2 behaviour for legitimate publisher copy.
+- **Parity coverage guard (P2, was in v0.2.4).**
+  `test_fixture_set_covers_a_through_f_grade_range` previously
+  required only `{"A", "B", "F"}` even though the docstring claimed
+  to pin `A, B, C, F`. A future PR could silently drop the C-grade
+  fixture without failing the test. Tightened to require all four
+  documented grades.
+
+### Notes
+
+- Test count: 46 → 49 (+3 regression tests for the v0.2.5 fixes).
+- All four findings credit chatgpt-codex-connector[bot]'s automated
+  review on PRs #4 / #5 / #6.
+
 ## [0.2.4] - 2026-05-02
 
 Public parity fixture release. Closes review item #9 from the v0.2
