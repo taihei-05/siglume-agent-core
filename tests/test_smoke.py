@@ -10,7 +10,7 @@ from __future__ import annotations
 
 def test_package_version_present():
     import siglume_agent_core
-    assert siglume_agent_core.__version__ == "0.1.0"
+    assert siglume_agent_core.__version__ == "0.2.0"
 
 
 def test_tool_manual_validator_imports():
