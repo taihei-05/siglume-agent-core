@@ -10,7 +10,6 @@ from __future__ import annotations
 import os
 from typing import Any
 
-import anthropic
 from siglume_agent_core.provider_adapters.types import (
     NormalizedToolCall,
     ProviderToolDefinition,
@@ -18,16 +17,42 @@ from siglume_agent_core.provider_adapters.types import (
     ToolTurnResult,
 )
 
+# Anthropic SDK is an OPTIONAL extra. Don't import at module top level —
+# core users (e.g. only using tool_manual_validator or installed_tool_prefilter)
+# would otherwise hit ImportError on `import siglume_agent_core.provider_adapters.anthropic_tools`.
+# We resolve the SDK lazily inside the adapter so importing this module
+# never fails; constructing the adapter without the SDK installed raises
+# a precise error pointing at the install command.
+
 # ---------------------------------------------------------------------------
 # Adapter
 # ---------------------------------------------------------------------------
+
+
+def _require_anthropic() -> Any:
+    """Import the anthropic SDK on demand, with an actionable error."""
+    try:
+        import anthropic  # noqa: WPS433 — lazy import is intentional
+    except ImportError as exc:  # pragma: no cover — environment-dependent
+        raise ImportError(
+            "The Anthropic provider adapter requires the optional `anthropic` "
+            "extra. Install it with:\n"
+            "    pip install 'siglume-agent-core[anthropic]'"
+        ) from exc
+    return anthropic
+
 
 class AnthropicToolAdapter:
     """Wraps the Anthropic messages API for tool-augmented turns."""
 
     def __init__(self, api_key: str | None = None) -> None:
+        anthropic = _require_anthropic()
         resolved_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
         self._client = anthropic.Anthropic(api_key=resolved_key)
+        # Cache the module reference so APIError exception class is the
+        # same object the SDK actually raised (avoids subtle import-cache
+        # mismatches under reload).
+        self._anthropic_module = anthropic
 
     # -- public ------------------------------------------------------------
 
@@ -40,11 +65,21 @@ class AnthropicToolAdapter:
         max_output_tokens: int = 4096,
         tool_choice: str = "auto",
     ) -> ToolTurnResult:
-        """Execute one turn of tool-augmented conversation."""
+        """Execute one turn of tool-augmented conversation.
+
+        ``tool_choice`` accepts ``"auto"`` (LLM picks 0+ tools), ``"any"``
+        (LLM must pick at least one tool), or ``"none"`` (LLM may not call
+        tools this turn). Anthropic's tool-use API has no direct "none"
+        mode, so for ``"none"`` the adapter elides ``tools`` and
+        ``tool_choice`` entirely from the request — the model receives no
+        tool definitions and physically cannot emit a ``tool_use`` block.
+        This matches OpenAI's ``tool_choice="none"`` semantics; relying on
+        a textual hint to "not use tools" is unreliable for action /
+        payment-class capabilities and must not be the contract here.
+        """
         try:
             system_text, anthropic_messages = self._convert_messages(messages)
             anthropic_tools = self._convert_tools(tools)
-            tc = self._convert_tool_choice(tool_choice)
 
             kwargs: dict[str, Any] = dict(
                 model=model,
@@ -53,14 +88,16 @@ class AnthropicToolAdapter:
             )
             if system_text:
                 kwargs["system"] = system_text
-            if anthropic_tools:
+            # tool_choice="none" must HARD-disable tool use, not just hint at it.
+            # Drop the tools array entirely so the model has nothing to call.
+            if anthropic_tools and tool_choice != "none":
                 kwargs["tools"] = anthropic_tools
-                kwargs["tool_choice"] = tc
+                kwargs["tool_choice"] = self._convert_tool_choice(tool_choice)
 
             response = self._client.messages.create(**kwargs)
             return self._parse_response(response)
 
-        except anthropic.APIError as exc:
+        except self._anthropic_module.APIError as exc:
             raise RuntimeError(
                 f"Anthropic API error during tool turn: {exc}"
             ) from exc
@@ -142,10 +179,18 @@ class AnthropicToolAdapter:
 
     @staticmethod
     def _convert_tool_choice(tool_choice: str) -> dict[str, str]:
+        # NOTE: "none" is handled at the call site in `run_turn` by eliding
+        # the tools array entirely (Anthropic has no direct "none"). This
+        # mapping is only consulted when tools ARE being sent, so "none"
+        # should never reach here in normal flow. Keep "none" mapped to
+        # "auto" as a safe fallback if the call-site guard is ever
+        # bypassed: at worst the LLM may decide to call a tool, but
+        # callers asking for "none" should rely on the elision contract,
+        # not on this fallback.
         mapping = {
             "auto": {"type": "auto"},
             "any": {"type": "any"},
-            "none": {"type": "auto"},  # no direct "none"; skip tools instead
+            "none": {"type": "auto"},
         }
         return mapping.get(tool_choice, {"type": "auto"})
 

@@ -30,7 +30,7 @@ pip install siglume-agent-core[openai]    # + OpenAI adapter
 pip install siglume-agent-core[dev]       # + test/lint deps
 ```
 
-## What's in this release (Phase 1, Tier A)
+## What's in this release (v0.2, Tier A + Tier B Phase 1)
 
 ### `siglume_agent_core.tool_manual_validator`
 
@@ -48,14 +48,42 @@ if not result.ok:
 
 quality = score_manual_quality(manual)
 print(f"Grade {quality.grade} ({quality.overall_score}/100)")
-print(f"Publishable: {quality.publishable}")
+# Platform accepts grade A and B at publish time; C/D/F are rejected.
+if quality.grade in ("A", "B"):
+    print("Likely publishable — submit when ready.")
+else:
+    print("Improve before submitting:")
+    for s in quality.improvement_suggestions[:3]:
+        print(f"  - {s}")
 ```
 
 This is **byte-equivalent** to the server-side scorer — verified by CI parity test against the Siglume monorepo. If your local grade is B, the server grade is B.
 
+### `siglume_agent_core.installed_tool_prefilter`
+
+TF-IDF + cosine similarity scorer that picks the top-N most-relevant tools when an agent has many bound, so the chat system prompt stays within the input token budget. Pure-Python, no embedding service. Same code the platform runs in production:
+
+```python
+from siglume_agent_core.installed_tool_prefilter import select_top_tools_for_prompt
+from siglume_agent_core.types import ResolvedToolDefinition
+
+# tools is whatever your code resolved from a binding registry.
+top = select_top_tools_for_prompt(tools, user_message="translate this to japanese", max_tools=50)
+# `top` is a subset of `tools`, ranked by JTBD relevance, original order preserved.
+```
+
 ### `siglume_agent_core.provider_adapters`
 
 Provider-specific adapters that convert an internal tool definition + message thread into the format Anthropic's or OpenAI's tool-use API expects, and parse the response back into a uniform shape.
+
+The provider SDKs are **optional extras** — install only the ones you use:
+
+```bash
+pip install siglume-agent-core[anthropic]   # + Anthropic SDK
+pip install siglume-agent-core[openai]      # + OpenAI SDK
+```
+
+Without the matching extra, importing the adapter raises a clear `ImportError` telling you which extra to install. Then:
 
 ```python
 from siglume_agent_core.provider_adapters.anthropic_tools import AnthropicToolAdapter
@@ -67,12 +95,12 @@ turn = adapter.run_turn(
     messages=[ToolMessage(role="user", content="...")],
     tools=[...],
     max_output_tokens=2048,
-    tool_choice="auto",
+    tool_choice="auto",  # "auto" | "any" | "none"
 )
 print(turn.tool_calls)  # what the LLM picked
 ```
 
-Use the **same adapter** the platform uses, so you can prototype tool-use applications against either provider with consistent behavior.
+`tool_choice="none"` means **no tool use this turn** — the adapter elides the `tools` array entirely, matching the contract you'd expect from OpenAI. Use the same adapter the platform uses, so you can prototype tool-use applications against either provider with consistent behavior.
 
 ## What's **not** in this repo
 

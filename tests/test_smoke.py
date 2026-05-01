@@ -10,7 +10,7 @@ from __future__ import annotations
 
 def test_package_version_present():
     import siglume_agent_core
-    assert siglume_agent_core.__version__ == "0.2.0"
+    assert siglume_agent_core.__version__ == "0.2.1"
 
 
 def test_tool_manual_validator_imports():
@@ -82,10 +82,175 @@ def test_provider_adapter_types_import():
 
 
 def test_anthropic_adapter_imports_without_sdk():
-    """The adapter module should import even if the anthropic SDK isn't installed."""
+    """The adapter module imports cleanly regardless of whether the
+    anthropic SDK is installed (lazy import — see _require_anthropic).
+    """
     from siglume_agent_core.provider_adapters import anthropic_tools  # noqa: F401
 
 
 def test_openai_adapter_imports_without_sdk():
-    """The adapter module should import even if the openai SDK isn't installed."""
+    """Same contract for the OpenAI adapter — module import never fails
+    on missing optional SDK; the SDK is required only at adapter
+    instantiation time.
+    """
     from siglume_agent_core.provider_adapters import openai_tools  # noqa: F401
+
+
+def test_anthropic_adapter_constructor_raises_actionable_error_without_sdk(monkeypatch):
+    """When the anthropic SDK isn't installed, instantiating
+    AnthropicToolAdapter must raise ImportError with the exact install
+    command the caller needs to run.
+    """
+    from siglume_agent_core.provider_adapters import anthropic_tools
+
+    def _fake_require_anthropic():
+        raise ImportError(
+            "The Anthropic provider adapter requires the optional `anthropic` "
+            "extra. Install it with:\n    pip install 'siglume-agent-core[anthropic]'"
+        )
+
+    monkeypatch.setattr(anthropic_tools, "_require_anthropic", _fake_require_anthropic)
+    import pytest
+    with pytest.raises(ImportError) as exc_info:
+        anthropic_tools.AnthropicToolAdapter(api_key="dummy")
+    assert "siglume-agent-core[anthropic]" in str(exc_info.value)
+
+
+def test_openai_adapter_constructor_raises_actionable_error_without_sdk(monkeypatch):
+    """Same contract for the OpenAI adapter."""
+    from siglume_agent_core.provider_adapters import openai_tools
+
+    def _fake_require_openai():
+        raise ImportError(
+            "The OpenAI provider adapter requires the optional `openai` "
+            "extra. Install it with:\n    pip install 'siglume-agent-core[openai]'"
+        )
+
+    monkeypatch.setattr(openai_tools, "_require_openai", _fake_require_openai)
+    import pytest
+    with pytest.raises(ImportError) as exc_info:
+        openai_tools.OpenAIToolAdapter(api_key="dummy")
+    assert "siglume-agent-core[openai]" in str(exc_info.value)
+
+
+def test_anthropic_adapter_tool_choice_none_elides_tools(monkeypatch):
+    """tool_choice='none' must result in no `tools` and no `tool_choice`
+    in the request — the model physically cannot emit a tool_use block.
+    Verifies the v0.2.1 contract: 'none' is not a hint, it's a hard
+    disable. Critical when action / payment-class tools share the
+    adapter."""
+    import pytest
+    pytest.importorskip("anthropic")
+
+    from siglume_agent_core.provider_adapters import anthropic_tools
+    from siglume_agent_core.provider_adapters.types import (
+        ProviderToolDefinition,
+        ToolMessage,
+    )
+
+    captured: dict[str, object] = {}
+
+    class _FakeMessages:
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            class _Resp:
+                content = []
+                stop_reason = "end_turn"
+                def model_dump(self_inner):
+                    return {}
+            return _Resp()
+
+    class _FakeClient:
+        def __init__(self, *a, **kw):
+            self.messages = _FakeMessages()
+
+    class _FakeAPIError(Exception):
+        pass
+
+    class _FakeAnthropicModule:
+        APIError = _FakeAPIError
+        @staticmethod
+        def Anthropic(*a, **kw):
+            return _FakeClient()
+
+    monkeypatch.setattr(
+        anthropic_tools, "_require_anthropic", lambda: _FakeAnthropicModule
+    )
+    adapter = anthropic_tools.AnthropicToolAdapter(api_key="dummy")
+    adapter.run_turn(
+        model="claude-haiku-4-5-20251001",
+        messages=[ToolMessage(role="user", content="say hi")],
+        tools=[
+            ProviderToolDefinition(
+                name="dangerous_action",
+                description="must NOT be callable when tool_choice=none",
+                parameters={"type": "object", "properties": {}},
+            )
+        ],
+        max_output_tokens=512,
+        tool_choice="none",
+    )
+    assert "tools" not in captured, (
+        "tool_choice='none' must elide tools entirely — found in request payload"
+    )
+    assert "tool_choice" not in captured, (
+        "tool_choice='none' must elide tool_choice key — found in request payload"
+    )
+
+
+def test_anthropic_adapter_tool_choice_auto_passes_tools(monkeypatch):
+    """Sanity counter-test: tool_choice='auto' MUST send tools so the
+    elision in the 'none' case is genuinely conditional, not a regression."""
+    import pytest
+    pytest.importorskip("anthropic")
+
+    from siglume_agent_core.provider_adapters import anthropic_tools
+    from siglume_agent_core.provider_adapters.types import (
+        ProviderToolDefinition,
+        ToolMessage,
+    )
+
+    captured: dict[str, object] = {}
+
+    class _FakeMessages:
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            class _Resp:
+                content = []
+                stop_reason = "end_turn"
+                def model_dump(self_inner):
+                    return {}
+            return _Resp()
+
+    class _FakeClient:
+        def __init__(self, *a, **kw):
+            self.messages = _FakeMessages()
+
+    class _FakeAPIError(Exception):
+        pass
+
+    class _FakeAnthropicModule:
+        APIError = _FakeAPIError
+        @staticmethod
+        def Anthropic(*a, **kw):
+            return _FakeClient()
+
+    monkeypatch.setattr(
+        anthropic_tools, "_require_anthropic", lambda: _FakeAnthropicModule
+    )
+    adapter = anthropic_tools.AnthropicToolAdapter(api_key="dummy")
+    adapter.run_turn(
+        model="claude-haiku-4-5-20251001",
+        messages=[ToolMessage(role="user", content="hi")],
+        tools=[
+            ProviderToolDefinition(
+                name="t",
+                description="x",
+                parameters={"type": "object", "properties": {}},
+            )
+        ],
+        max_output_tokens=512,
+        tool_choice="auto",
+    )
+    assert "tools" in captured
+    assert "tool_choice" in captured
