@@ -34,6 +34,53 @@ _TOOL_NAME_RE = re.compile(r"^[A-Za-z0-9_]{3,64}$")
 _MAX_NESTED_DEPTH = 8
 _COMPOSITION_KEYWORDS = frozenset({"oneOf", "anyOf", "allOf"})
 
+# v0.2.3 prompt-injection hardening (review item #7).
+# Property descriptions in input_schema get embedded in the LLM's tool
+# catalog block via generate_compact_prompt → _flatten_input_schema.
+# A malicious publisher could otherwise stuff long-form instructions or
+# explicit injection text into a description and influence buyer-side
+# turns. Cap length and reject obvious injection markers at submission
+# time. Length is set generously so legitimate descriptions
+# (units, formats, examples) still fit; the bar is "no manual page
+# disguised as a description".
+MAX_PROPERTY_DESCRIPTION_LEN = 500
+
+# Case-insensitive substring patterns that strongly indicate prompt
+# injection rather than legitimate field documentation. Conservative —
+# we want zero false positives on well-written publisher copy. Each
+# pattern reflects a known jailbreak / prompt-leak technique. Add new
+# patterns sparingly and only when seen in the wild.
+_INJECTION_PATTERNS: tuple[str, ...] = (
+    "ignore previous instructions",
+    "ignore the above",
+    "ignore all prior",
+    "disregard previous",
+    "disregard the above",
+    "system prompt",
+    "developer message",
+    "reveal the prompt",
+    "reveal the system",
+    "print the prompt",
+    "print the system",
+    "show me your prompt",
+    "show your prompt",
+    "bypass safety",
+    "bypass guardrails",
+    "you are now",
+    "act as if",
+    "pretend you are",
+    "<|im_start|>",
+    "<|im_end|>",
+    "[INST]",
+    "[/INST]",
+    "</s>",
+    # Common JA jailbreak phrasings — mirror the EN list at the marker
+    # frequencies we observe most.
+    "前の指示を無視",
+    "上記を無視",
+    "システムプロンプト",
+)
+
 VALID_SETTLEMENT_MODES = {
     "stripe_checkout",
     "stripe_payment_intent",
@@ -270,14 +317,17 @@ def validate_input_schema(schema: dict) -> list[str]:
     # Max nested depth
     _check_nested_depth(schema, errs, current_depth=0)
 
-    # No platform-injected fields in properties
-    props = schema.get("properties", {})
-    if isinstance(props, dict):
-        for field_name in props:
-            if field_name in PLATFORM_INJECTED_FIELDS:
-                errs.append(
-                    f"Property '{field_name}' is platform-injected and must not appear in input_schema"
-                )
+    # No platform-injected fields anywhere in the schema (recursive).
+    # Previously root-only; v0.2.3 widens the check to nested object
+    # schemas, array items, and composition branches so a malicious
+    # publisher cannot smuggle a `trace_id` / `connected_account_id`
+    # property under a nested object or `oneOf` branch and have it
+    # collide with platform-set values at runtime (review item #8).
+    _check_platform_injected_recursive(schema, errs, path="")
+
+    # Property description length + prompt-injection pattern check
+    # (review item #7).
+    _check_property_descriptions(schema, errs, path="")
 
     return errs
 
@@ -550,6 +600,81 @@ def _check_forbidden_key(
                     forbidden,
                     errs,
                     path=f"{path}.{key}[{index}]" if path else f"{key}[{index}]",
+                )
+
+
+def _check_platform_injected_recursive(
+    schema: Any,
+    errs: list[str],
+    path: str,
+) -> None:
+    """Walk every level of the schema flagging any property whose name
+    collides with a platform-injected field. Mirrors the traversal of
+    ``_check_forbidden_key`` so nested object schemas, array items, and
+    composition branches all get the same protection as the root.
+    """
+    if not isinstance(schema, dict):
+        return
+    for key, val in schema.items():
+        if key == "properties" and isinstance(val, dict):
+            for pname, pdef in val.items():
+                if pname in PLATFORM_INJECTED_FIELDS:
+                    location = f" at {path}.{pname}" if path else f" at {pname}"
+                    errs.append(
+                        f"Property '{pname}' is platform-injected and must not appear in input_schema{location}"
+                    )
+                _check_platform_injected_recursive(
+                    pdef, errs, path=f"{path}.{pname}" if path else pname
+                )
+        elif key == "items" and isinstance(val, dict):
+            _check_platform_injected_recursive(val, errs, path=f"{path}.items" if path else "items")
+        elif key in _COMPOSITION_KEYWORDS and isinstance(val, list):
+            for index, branch in enumerate(val):
+                _check_platform_injected_recursive(
+                    branch, errs, path=f"{path}.{key}[{index}]" if path else f"{key}[{index}]"
+                )
+
+
+def _check_property_descriptions(
+    schema: Any,
+    errs: list[str],
+    path: str,
+) -> None:
+    """Walk every property at every depth, flagging description fields
+    that exceed ``MAX_PROPERTY_DESCRIPTION_LEN`` or contain known prompt-
+    injection patterns. Property descriptions are embedded in the LLM
+    tool catalog block at runtime, so a malicious publisher could
+    otherwise plant instructions there.
+    """
+    if not isinstance(schema, dict):
+        return
+    description = schema.get("description")
+    if isinstance(description, str):
+        if len(description) > MAX_PROPERTY_DESCRIPTION_LEN:
+            location = f" at {path}" if path else ""
+            errs.append(
+                f"Property description exceeds {MAX_PROPERTY_DESCRIPTION_LEN} chars "
+                f"(got {len(description)}){location}"
+            )
+        lowered = description.lower()
+        for marker in _INJECTION_PATTERNS:
+            if marker.lower() in lowered:
+                location = f" at {path}" if path else ""
+                errs.append(
+                    f"Property description contains a known prompt-injection "
+                    f"pattern ({marker!r}){location}"
+                )
+                break  # one error per description is enough; don't spam
+    for key, val in schema.items():
+        if key == "properties" and isinstance(val, dict):
+            for pname, pdef in val.items():
+                _check_property_descriptions(pdef, errs, path=f"{path}.{pname}" if path else pname)
+        elif key == "items" and isinstance(val, dict):
+            _check_property_descriptions(val, errs, path=f"{path}.items" if path else "items")
+        elif key in _COMPOSITION_KEYWORDS and isinstance(val, list):
+            for index, branch in enumerate(val):
+                _check_property_descriptions(
+                    branch, errs, path=f"{path}.{key}[{index}]" if path else f"{key}[{index}]"
                 )
 
 
