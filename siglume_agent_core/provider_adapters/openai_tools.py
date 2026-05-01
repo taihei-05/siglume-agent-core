@@ -12,13 +12,32 @@ import os
 import re
 from typing import Any
 
-import openai
 from siglume_agent_core.provider_adapters.types import (
     NormalizedToolCall,
     ProviderToolDefinition,
     ToolMessage,
     ToolTurnResult,
 )
+
+# OpenAI SDK is an OPTIONAL extra. Don't import at module top level —
+# core users (e.g. only using tool_manual_validator or installed_tool_prefilter)
+# would otherwise hit ImportError on `import siglume_agent_core.provider_adapters.openai_tools`.
+# We resolve the SDK lazily so importing this module never fails;
+# constructing the adapter without the SDK installed raises a precise
+# error pointing at the install command.
+
+
+def _require_openai() -> Any:
+    """Import the openai SDK on demand, with an actionable error."""
+    try:
+        import openai  # noqa: WPS433 — lazy import is intentional
+    except ImportError as exc:  # pragma: no cover — environment-dependent
+        raise ImportError(
+            "The OpenAI provider adapter requires the optional `openai` "
+            "extra. Install it with:\n"
+            "    pip install 'siglume-agent-core[openai]'"
+        ) from exc
+    return openai
 
 # OpenAI reasoning / GPT-5 model families reject the legacy ``max_tokens``
 # request kwarg with HTTP 400 ``"Use 'max_completion_tokens'"``. The 2026-04
@@ -67,8 +86,12 @@ class OpenAIToolAdapter:
     """Wraps the OpenAI chat-completions API for tool-augmented turns."""
 
     def __init__(self, api_key: str | None = None) -> None:
+        openai = _require_openai()
         resolved_key = api_key or os.environ.get("OPENAI_API_KEY")
         self._client = openai.OpenAI(api_key=resolved_key)
+        # Cache the module reference for use by run_turn's exception
+        # filtering, mirroring the Anthropic adapter pattern.
+        self._openai_module = openai
 
     # -- public ------------------------------------------------------------
 
@@ -98,7 +121,7 @@ class OpenAIToolAdapter:
             response = self._client.chat.completions.create(**kwargs)
             return self._parse_response(response)
 
-        except openai.APIError as exc:
+        except self._openai_module.APIError as exc:
             raise RuntimeError(
                 f"OpenAI API error during tool turn: {exc}"
             ) from exc

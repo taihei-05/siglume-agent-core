@@ -11,6 +11,50 @@ public API while extraction from the private monorepo is in progress.
 
 (no changes)
 
+## [0.2.1] - 2026-05-02
+
+Bugfix release addressing three findings from external review of the v0.2
+public surface. No new public APIs; all changes are corrections to v0.2
+behaviour and documentation.
+
+### Fixed
+
+- **README example was broken.** The v0.2 quickstart referenced
+  `quality.publishable`, a field that does not exist on `QualityScore`.
+  Replaced with a `quality.grade in ("A", "B")` check that matches the
+  platform's actual publish-time gate.
+- **Provider adapters could not be imported in core-only installs.**
+  `siglume_agent_core.provider_adapters.anthropic_tools` and
+  `openai_tools` imported the SDK at module top level, so
+  `pip install siglume-agent-core` (without the `[anthropic]` /
+  `[openai]` extras) failed at module-import time even when the user
+  never intended to construct an adapter. The SDK is now lazy-imported
+  inside the adapter constructor; if the matching extra is missing the
+  constructor raises `ImportError` with the exact `pip install` command
+  to fix it. Module imports always succeed.
+- **`AnthropicToolAdapter` did not honour `tool_choice="none"`.**
+  Anthropic's API has no direct `"none"` mode, and the adapter mapped
+  `"none"` -> `{"type": "auto"}` while still sending the tools array,
+  so the LLM remained able to emit `tool_use` blocks. The adapter now
+  elides both `tools` and `tool_choice` from the request when
+  `tool_choice="none"`, matching OpenAI's `"none"` semantics. Critical
+  for action / payment-class capabilities sharing the adapter — relying
+  on textual hints to "not use tools" is unreliable.
+
+### Added
+
+- README v0.2 reflection: `installed_tool_prefilter` quickstart added,
+  the v0.1-era `Phase 1 / Tier A` heading replaced with
+  `v0.2, Tier A + Tier B Phase 1`, optional-extras install instructions
+  documented.
+- 4 new regression tests in `tests/test_smoke.py`:
+  - Constructor raises actionable `ImportError` when SDK is absent
+    (Anthropic + OpenAI).
+  - `tool_choice="none"` elides `tools` and `tool_choice` from the
+    Anthropic request payload.
+  - `tool_choice="auto"` still sends them (counter-test against
+    accidental over-elision).
+
 ## [0.2.0] - 2026-05-01
 
 ### Added
