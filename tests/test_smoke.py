@@ -12,7 +12,56 @@ from __future__ import annotations
 def test_package_version_present():
     import siglume_agent_core
 
-    assert siglume_agent_core.__version__ == "0.6.0"
+    assert siglume_agent_core.__version__ == "0.7.0"
+
+
+def test_dev_simulator_imports():
+    from siglume_agent_core.dev_simulator import (
+        ANTHROPIC_PROPERTY_KEY_RE,
+        ANTHROPIC_TOOL_NAME_RE,
+        SIMULATE_MODEL,
+        SIMULATE_SYSTEM_PROMPT,
+        STOP_WORDS,
+        LLMSimulateCall,
+        LLMSimulateResponse,
+        LLMSimulateToolUseBlock,
+        SimulatedToolCall,
+        SimulationResult,
+        build_tool_def,
+        extract_keywords,
+        filter_tools_for_anthropic,
+        sanitize_input_schema_for_anthropic,
+        score_candidate,
+        select_candidates,
+        simulate_planner,
+    )
+
+    assert SIMULATE_MODEL == "claude-haiku-4-5-20251001"
+    assert isinstance(STOP_WORDS, frozenset)
+    assert ANTHROPIC_PROPERTY_KEY_RE.pattern == r"^[a-zA-Z0-9_.-]{1,64}$"
+    assert ANTHROPIC_TOOL_NAME_RE.pattern == r"^[a-zA-Z0-9_-]{1,64}$"
+    for fn in (
+        build_tool_def,
+        extract_keywords,
+        filter_tools_for_anthropic,
+        sanitize_input_schema_for_anthropic,
+        score_candidate,
+        select_candidates,
+        simulate_planner,
+    ):
+        assert callable(fn)
+    # LLMSimulateCall (Callable[...] type alias) imports successfully — the
+    # bare `from ... import LLMSimulateCall` at the top of this test fails
+    # at collection time if the symbol is missing, which is the only check
+    # we actually need.
+    _ = LLMSimulateCall  # noqa: F841 — kept so the unused-import linter is happy
+    assert SimulatedToolCall.__module__ == "siglume_agent_core.dev_simulator"
+    assert SimulationResult.__module__ == "siglume_agent_core.dev_simulator"
+    assert LLMSimulateResponse.__module__ == "siglume_agent_core.dev_simulator"
+    assert LLMSimulateToolUseBlock.__module__ == "siglume_agent_core.dev_simulator"
+    assert SIMULATE_SYSTEM_PROMPT.startswith(
+        "You are a dev simulator for the Siglume API Store planner."
+    )
 
 
 def test_orchestrate_helpers_imports():

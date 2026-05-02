@@ -11,6 +11,108 @@ public API while extraction from the private monorepo is in progress.
 
 (no changes)
 
+## [0.7.0] - 2026-05-02
+
+Tier C Phase 3. The publisher dev-simulator's pure stages move into
+agent-core. The platform's
+``packages/shared-python/agent_sns/application/capability_runtime/dev_simulator.py``
+shrinks from ~375 lines to a thin shim that fetches catalog rows from
+the DB and wraps the Anthropic SDK behind an ``LLMSimulateCall`` —
+everything else (keyword pre-filter, dedupe / Anthropic-regex filter,
+predicted-chain reconstruction, all four diagnostic ``note`` strings)
+now sources from this package.
+
+### Added
+
+- **``siglume_agent_core.dev_simulator``** — new module with the pure
+  publisher dev-simulator helpers.
+
+  - ``simulate_planner(rows, *, offer_text, quota_used_today,
+    quota_limit, llm_call, max_candidates=10, model=SIMULATE_MODEL)
+    -> SimulationResult`` — high-level entry point. Composes
+    ``select_candidates`` + ``filter_tools_for_anthropic`` + the
+    injected LLM call into a single ``SimulationResult``. Catalog
+    selection (which DB rows to pass) stays the caller's
+    responsibility.
+
+  - Composable primitives: ``select_candidates`` (score + truncate to
+    top-N), ``filter_tools_for_anthropic`` (dedupe + Anthropic
+    name-regex skip with first-wins-by-score order, returns the
+    ``listing_lookup`` so the caller can re-attach listing metadata
+    to the LLM's emitted blocks).
+
+  - Tested-in-isolation pure helpers: ``extract_keywords`` (regex +
+    stop-word filter), ``score_candidate`` (keyword overlap count),
+    ``build_tool_def`` (field-fallback chain
+    ``tool_prompt_compact`` -> ``manual.compact_prompt`` ->
+    ``manual.description`` -> ``manual.summary_for_model`` ->
+    ``listing.description`` -> ``listing.title`` -> ``capability_key``
+    with a 600-char description clip),
+    ``sanitize_input_schema_for_anthropic`` (recursive bad-key drop +
+    ``required`` pruning, never mutates the caller's schema).
+
+  - Provider-neutral message types: ``LLMSimulateResponse`` /
+    ``LLMSimulateToolUseBlock`` (frozen dataclasses) +
+    ``LLMSimulateCall`` (type alias for the injected callable
+    signature ``(system_prompt, tools, user_message) ->
+    LLMSimulateResponse``). The callable contract is "MUST NOT raise"
+    — provider failures surface as ``error_note`` so
+    ``simulate_planner`` can propagate them verbatim.
+
+  - Result records: ``SimulatedToolCall`` / ``SimulationResult``
+    (kept non-frozen — pinned by tests so future drift to ``frozen=True``
+    is caught at CI rather than at runtime in callers that mutate
+    ``.args`` or ``.predicted_chain``).
+
+  - Catalog-row Protocols: ``ProductListingLike`` /
+    ``CapabilityReleaseLike``. Platform ORM models satisfy them
+    structurally — agent-core never imports SQLAlchemy.
+
+  - Public constants: ``SIMULATE_MODEL`` (default Anthropic Haiku),
+    ``SIMULATE_SYSTEM_PROMPT`` (the exact prompt the monorepo
+    shipped), ``STOP_WORDS`` (closed list — drift here moves the
+    scoring distribution silently),
+    ``ANTHROPIC_PROPERTY_KEY_RE`` / ``ANTHROPIC_TOOL_NAME_RE``
+    (Anthropic-side input validation patterns; tighter regex on tool
+    name (no dots) than property key).
+
+### Behavior preserved (byte-equivalent)
+
+- All four diagnostic ``SimulationResult.note`` strings produced
+  verbatim: ``"empty offer_text"``,
+  ``"no candidate tools — catalog empty or all listings unusable"``,
+  ``"no candidate tools survived Anthropic schema validation
+  (skipped X duplicate, Y non-conforming name)"``,
+  ``"LLM picked no tools (offer may not match any catalog entry)"``.
+  Any ``error_note`` from the injected ``LLMSimulateCall`` is also
+  propagated as-is — including the platform shim's
+  ``"anthropic SDK not available"`` and ``"llm error: <ExcType>"``
+  payloads.
+
+- Dedupe + skip semantics (PR #203 in the monorepo): first-wins by
+  score order, ``skipped_dup`` and ``skipped_bad_name`` counters
+  surfaced into the no-survivors note exactly as before.
+
+- Schema sanitization (PR #201 in the monorepo): bad property keys
+  dropped from this level (and from any nested ``properties``),
+  matching ``required`` entries pruned, original schema untouched.
+
+- 600-char description clip on ``build_tool_def`` and the field
+  fallback order through manual / release / listing fields.
+
+- ``select_candidates`` clamps ``max_candidates`` to a minimum of 1
+  via ``max(1, max_candidates)`` — same shape callers passing 0 saw
+  pre-extraction.
+
+### Notes
+
+- The Anthropic SDK stays out of this package. The platform shim
+  imports ``anthropic`` lazily inside its ``LLMSimulateCall`` factory
+  and converts ``response.content[i]`` (where ``type == "tool_use"``)
+  into ``LLMSimulateToolUseBlock``. SDK-missing and call-raised paths
+  return an ``LLMSimulateResponse`` with ``error_note`` set so the
+  pure loop here never has to know about provider failures.
+
 ## [0.6.0] - 2026-05-02
 
 Tier C Phase 2. The orchestrate inner loop body itself moves into
