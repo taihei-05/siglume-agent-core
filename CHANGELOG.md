@@ -11,6 +11,122 @@ public API while extraction from the private monorepo is in progress.
 
 (no changes)
 
+## [0.4.0] - 2026-05-02
+
+Tier B Phase 2 cont. The pure decision functions feeding the platform's
+``capability_failure_learning`` surface land as public source. The DB
+write itself stays in the platform (it needs a SQLAlchemy ``Session``
+and a SAVEPOINT for the supersede + insert pair), but the *decisions*
+the row encodes — which failure kind, which task family, how long the
+avoidance lasts, what the advice text says — are now fully readable as
+source.
+
+### Added
+
+- **``siglume_agent_core.capability_failure_learning``** — pure helpers
+  the platform composes into its DB-bound record/query entry points.
+  Public API:
+  - ``failure_kind_from_execution(*, status, api_outcome, details)``:
+    classify an execution into one of ``"out_of_coverage"`` /
+    ``"policy_or_limit"`` / ``"runtime_unavailable"`` /
+    ``"execution_failure"`` / ``None``. Priority: out_of_coverage wins
+    over status (a tool that returned but did nothing useful is still
+    a coverage gap), then policy/limit keywords, then transient
+    runtime keywords, then a generic execution_failure fallback.
+  - ``infer_capability_task_family(user_message, goal)``: bucket
+    requests into ``"short_translation"`` / ``"long_or_general_translation"``
+    / ``"general_request"``. The translator-vs-general split partitions
+    learnings so an out_of_coverage card from a long-form domain
+    translation doesn't poison short-translation availability.
+  - ``learning_expiry_for_kind(failure_kind, *, now)``: return the
+    absolute expiry instant (1h transient / 6h policy / 1d execution /
+    24h overflow / never for out_of_coverage). ``now`` is a required
+    keyword arg so the function is pure — callers (the platform DB
+    layer, tests, eval harnesses) supply their own clock.
+  - ``learning_scores_for_kind(failure_kind)``: ``(importance,
+    confidence)`` tuple in [0, 1] used to rank cards and signal
+    LLM weight. Out-of-coverage and overflow score highest because
+    their false-positive rate is low.
+  - ``build_learning_content(*, tool, failure_kind, task_family,
+    request_preview)``: render the human-readable advice string stored
+    on the card. Branches by ``failure_kind`` so each kind nudges the
+    LLM toward a different next step (try a different tool, retry
+    later, satisfy the missing condition).
+  - ``build_system_prompt_overflow_content(*, request_preview, fit_meta)``:
+    render the advice text for the systemic system-prompt-overflow
+    failure (Bug A class). Surfaces required-vs-budget detail when
+    available so an operator can size the gap immediately.
+  - ``clip_text(value, max_chars=900)``: collapse whitespace and
+    truncate with an ellipsis tail. Used for short storage previews.
+  - ``api_outcome_from_output(output)`` /
+    ``last_tool_output_from_steps(steps)`` /
+    ``api_outcome_from_execution(*, structured_output, step_results=None)``:
+    walk a multi-step execution and surface ``"out_of_coverage"``
+    if any layer affirmatively reports it.
+  - Public constants ``CAPABILITY_PREFERENCE_MEMORY_TYPE``,
+    ``CAPABILITY_LEARNING_TAG``, ``SYSTEM_PROMPT_OVERFLOW_KIND`` —
+    these are the literal strings the platform writes to the
+    ``memory_type`` column / ``tags_jsonb`` array / failure_kind
+    metadata field, so a rename here would silently invalidate every
+    existing memory card.
+
+### Repository pattern (callback-injection, same as v0.3)
+
+The DB-bound entry points (``record_capability_failure_learning``,
+``record_system_prompt_overflow_learning``, ``capability_learning_by_tool``,
+``should_avoid_tool_for_request``) stay in the platform — they need a
+SQLAlchemy ``Session`` and a SAVEPOINT around the supersede + insert
+pair. They compose the v0.4 helpers and persist the result however
+they like. A future eval harness or CLI replay tool can compose the
+same helpers against a different store (in-memory list, JSON file)
+without pulling in any DB dependency.
+
+### Clock injection
+
+``learning_expiry_for_kind`` requires ``now`` as a keyword argument so
+the function is fully pure — no implicit ``utcnow()``. The platform
+passes ``utcnow()`` from its infrastructure layer; tests pass a
+frozen instant for deterministic expiry assertions.
+
+### Notes
+
+- 51 new tests in ``tests/test_capability_failure_learning.py`` covering:
+  text-clip whitespace + ellipsis behaviour, all branches of the
+  outcome / failure-kind classifiers, both keyword priority orders
+  (policy > runtime), task-family translation classification (short
+  vs long via length / token-count / domain hint, JA + EN),
+  per-kind expiry deltas with a frozen clock, the ``now``-keyword-only
+  contract, per-kind importance/confidence scoring, all four
+  ``build_learning_content`` branches, and the overflow-content
+  detail-string toggling (present when both required+budget are
+  positive ints, omitted otherwise). Plus a smoke-test entry pinning
+  the public import surface.
+- Test count: 93 → 147 (53 in the new module + 1 smoke import).
+- The platform's ``capability_failure_learning.py`` becomes a thin
+  shim: pure helpers re-export from this package, the four DB-bound
+  entry points stay private and import the helpers from agent-core.
+  Production runs on the same decision code that ships here.
+
+### Roadmap update
+
+The v0.3 entry advertised v0.4 as ``capability_failure_learning`` +
+``dev_simulator``. ``dev_simulator`` is **deferred to v0.5+** — its DB
+touchpoint is a single capability lookup (cheap to factor) but the
+SchemaSanitizer + LLM-call wrapper layered on top of it have absorbed
+several monorepo-only changes since the recon (sanitization rules,
+Anthropic-name regex, dedupe). Re-extracting cleanly is half-a-day of
+work that's better batched with the larger Tier C ``orchestrate`` cut
+than rushed into v0.4. v0.4 ships ``capability_failure_learning``
+only; the open-readable surface still grows by one full module this
+release.
+
+- **v0.5 (Tier C)**: split ``tool_use_runtime.orchestrate`` into a
+  pure-planner half (open) and a platform-glue half (private), and
+  bring ``dev_simulator`` along in the same cut. The selector +
+  prefilter + failure-learning together cover catalog shaping +
+  post-execution feedback; orchestrate covers the multi-turn loop in
+  between.
+
 ## [0.3.0] - 2026-05-02
 
 Tier B Phase 2 release. The keyword-based tool selector — the second

@@ -12,7 +12,7 @@ Tier B Phase 1 (v0.2):
 - ``types.ResolvedToolDefinition``: the value-shape used by prefilter (and
   future Tier B modules). Mirrors the platform's resolver output.
 
-Tier B Phase 2 (v0.3, this release):
+Tier B Phase 2 (v0.3):
 - ``tool_selector``: dispatch-time keyword scorer. Runs after the prefilter
   trims the catalog: filters out tools with missing connected accounts
   (when their permission_class requires one), scores the remainder against
@@ -23,7 +23,21 @@ Tier B Phase 2 (v0.3, this release):
   ``strip_long_alphanumeric_secrets`` is exposed publicly for callers
   composing their own request-text redactor.
 
+Tier B Phase 2 cont. (v0.4, this release):
+- ``capability_failure_learning``: pure decision functions feeding the
+  platform's tool-failure memory cards. Classify execution outcomes
+  (``failure_kind_from_execution``), bucket requests into task families
+  (``infer_capability_task_family``), pick avoidance duration / scoring
+  per kind (``learning_expiry_for_kind`` / ``learning_scores_for_kind``),
+  and render the human-readable advice strings stored on each card
+  (``build_learning_content`` / ``build_system_prompt_overflow_content``).
+  The DB-bound entry points (record / query / supersede) stay in the
+  platform; the public functions compose into them so a publisher can
+  read exactly what triggers an avoidance and how long it lives. Clock
+  is injected: ``learning_expiry_for_kind`` requires ``now`` as a
+  keyword arg so the function is fully pure.
+
 See ARCHITECTURE.md for the staged extraction roadmap.
 """
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"

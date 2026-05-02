@@ -12,7 +12,7 @@ from __future__ import annotations
 def test_package_version_present():
     import siglume_agent_core
 
-    assert siglume_agent_core.__version__ == "0.3.0"
+    assert siglume_agent_core.__version__ == "0.4.0"
 
 
 def test_tool_selector_imports():
@@ -29,6 +29,41 @@ def test_tool_selector_imports():
     assert callable(extract_trigger_words)
     assert DEFAULT_MAX_CANDIDATES == 5
     assert UnmatchedRequestSignal.__module__ == "siglume_agent_core.tool_selector"
+
+
+def test_capability_failure_learning_imports():
+    from siglume_agent_core.capability_failure_learning import (
+        CAPABILITY_LEARNING_TAG,
+        CAPABILITY_PREFERENCE_MEMORY_TYPE,
+        SYSTEM_PROMPT_OVERFLOW_KIND,
+        api_outcome_from_execution,
+        api_outcome_from_output,
+        build_learning_content,
+        build_system_prompt_overflow_content,
+        clip_text,
+        failure_kind_from_execution,
+        infer_capability_task_family,
+        last_tool_output_from_steps,
+        learning_expiry_for_kind,
+        learning_scores_for_kind,
+    )
+
+    assert CAPABILITY_PREFERENCE_MEMORY_TYPE == "capability_preference"
+    assert CAPABILITY_LEARNING_TAG == "capability_failure_learning"
+    assert SYSTEM_PROMPT_OVERFLOW_KIND == "system_prompt_overflow"
+    for fn in (
+        api_outcome_from_execution,
+        api_outcome_from_output,
+        build_learning_content,
+        build_system_prompt_overflow_content,
+        clip_text,
+        failure_kind_from_execution,
+        infer_capability_task_family,
+        last_tool_output_from_steps,
+        learning_expiry_for_kind,
+        learning_scores_for_kind,
+    ):
+        assert callable(fn)
 
 
 def test_tool_manual_validator_imports():
