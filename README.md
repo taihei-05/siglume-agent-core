@@ -162,7 +162,7 @@ turn = adapter.run_turn(
 print(turn.tool_calls)  # what the LLM picked
 ```
 
-`tool_choice="none"` elides `tools` entirely — useful when an action / payment-class capability is forbidden this turn.
+`tool_choice="none"` hard-disables tool use this turn — useful when an action / payment-class capability is forbidden. The Anthropic adapter elides the `tools` array entirely (Anthropic's API has no native `"none"` mode); the OpenAI adapter passes OpenAI's native `tool_choice="none"` alongside the tools array. Both behave the same way to the caller: zero tool calls returned.
 
 ### 3. `installed_tool_prefilter` (v0.2)
 
@@ -195,30 +195,61 @@ top_k = select_tools(
 )
 ```
 
-Surfaces 3 distinct *miss* kinds — `no_candidates_after_prefilter`, `no_candidates_after_permission_filter`, `no_keyword_overlap` — via `on_unmatched` so the platform can persist them as gap signals (the SDK's seller analytics consume these).
+Surfaces 3 distinct *miss* kinds via `on_unmatched` so the platform can persist them as gap signals (the SDK's seller analytics consume these):
+
+- `no_tools_installed` — the agent's installed tool pool is empty (or the prefilter trimmed everything before it reached `select_tools`).
+- `all_filtered_account_missing` — every candidate was filtered out by the connected-account / permission gate (e.g. an OAuth account that should be linked isn't ready).
+- `no_keyword_match` — candidates passed the gate but none of their trigger words (drawn from `capability_key`, `display_name`, `description`, `usage_hints`) overlapped the request.
 
 ### 5. `capability_failure_learning` (v0.4)
 
 When a tool call fails, Siglume writes a "learning card" so the agent avoids that tool for the same kind of request for some duration. This module exports the **pure decision functions** behind that mechanism — the platform handles the DB write itself, but the rules of *what to avoid, for how long, with what score* live here.
 
+In the snippet below, `tool`, `structured_output`, `step_results`, `execution_status`, `error_details`, `request_text`, and `goal_text` are values your orchestrator already has after a tool call — the orchestrator's last `last_tool_output`, the per-step records it accumulated, the resolved `ResolvedToolDefinition`, and the buyer's request / goal text. The functions below are pure transforms over those values.
+
 ```python
+from datetime import datetime, timezone
+
 from siglume_agent_core.capability_failure_learning import (
+    api_outcome_from_execution,
+    build_learning_content,
     failure_kind_from_execution,
     infer_capability_task_family,
     learning_expiry_for_kind,
     learning_scores_for_kind,
-    build_learning_content,
 )
-from datetime import datetime, timezone
 
-kind = failure_kind_from_execution(execution_result)            # e.g. "permission_denied"
-family = infer_capability_task_family(intent_text)              # e.g. "translate"
-expires_at = learning_expiry_for_kind(kind, now=datetime.now(tz=timezone.utc))
-scores = learning_scores_for_kind(kind)                         # pin / decay
-content = build_learning_content(kind, family, intent_text)     # human-readable advice
+# 1. Classify what the execution actually returned.
+api_outcome = api_outcome_from_execution(
+    structured_output=structured_output,   # the orchestrator's last_tool_output, or None
+    step_results=step_results,             # the per-step records, or None
+)
+
+# 2. Decide which failure-kind label (if any) applies. May return None for "no learning".
+kind = failure_kind_from_execution(
+    status=execution_status,               # "succeeded" / "failed"
+    api_outcome=api_outcome,               # "success" / "out_of_coverage"
+    details=error_details,                 # free-text error string used for keyword matching
+)
+
+if kind is not None:
+    # 3. Bucket the request shape so a learning only fires on similar future requests.
+    family = infer_capability_task_family(
+        user_message=request_text,
+        goal=goal_text,
+    )
+    # 4. Pure decision outputs — clock and tool are injected, so this is fully testable.
+    expires_at = learning_expiry_for_kind(kind, now=datetime.now(tz=timezone.utc))
+    importance, confidence = learning_scores_for_kind(kind)
+    content = build_learning_content(
+        tool=tool,                          # ResolvedToolDefinition
+        failure_kind=kind,
+        task_family=family,
+        request_preview=request_text[:200],
+    )
 ```
 
-Clock is injected (`now` is a required keyword) so the function is fully pure — call it from tests without monkey-patching `datetime`.
+All decision functions are pure: the clock is injected (`now` is a required keyword on `learning_expiry_for_kind`), and `build_learning_content` takes the tool by argument rather than touching a registry. Call them from tests without monkey-patching `datetime` or installing a tool pool.
 
 ### 6. `orchestrate_helpers` and `orchestrate` (v0.5 + v0.6)
 
@@ -302,7 +333,23 @@ for call in result.predicted_chain:
     print(call.tool_name, call.listing_title, call.args)
 ```
 
-The platform's `siglume_dev_simulate` API endpoint (and the upcoming `siglume dev simulate` CLI in [`siglume-api-sdk#199`](https://github.com/taihei-05/siglume-api-sdk/issues/199)) wrap this exact function plus a DB query for catalog rows and an Anthropic Haiku call for `llm_call`. The pure logic is the same — if you self-host, you can replace either side.
+The platform's `siglume_dev_simulate` API endpoint and the `siglume dev simulate` CLI shipped in [`siglume-api-sdk`](https://github.com/taihei-05/siglume-api-sdk) wrap this exact function plus a DB query for catalog rows and an Anthropic Haiku call for `llm_call`. The pure logic is the same — if you self-host, you can replace either side.
+
+When you write your own `llm_call` for self-hosting, the contract is to **never raise**. Provider failures should be returned as a normal `LLMSimulateResponse` with `tool_use_blocks=[]` and a populated `error_note`; `simulate_planner` does not catch exceptions out of `llm_call`.
+
+```python
+from siglume_agent_core.dev_simulator import LLMSimulateResponse
+
+def my_anthropic_call(system_prompt, tools, user_msg) -> LLMSimulateResponse:
+    try:
+        resp = client.messages.create(model="claude-haiku-4-5", ...)
+    except Exception as exc:
+        return LLMSimulateResponse(
+            tool_use_blocks=[],
+            error_note=f"Anthropic simulate call failed: {type(exc).__name__}: {exc}",
+        )
+    return LLMSimulateResponse(tool_use_blocks=parse(resp), error_note=None)
+```
 
 ---
 
