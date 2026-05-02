@@ -11,6 +11,92 @@ public API while extraction from the private monorepo is in progress.
 
 (no changes)
 
+## [0.3.0] - 2026-05-02
+
+Tier B Phase 2 release. The keyword-based tool selector — the second
+half of the answer to "why didn't my listing get picked?" — lands as
+public source. The first half (``installed_tool_prefilter``) shipped
+in v0.2.0; together they cover the full LLM-visible tool catalog
+shaping path.
+
+### Added
+
+- **``siglume_agent_core.tool_selector``** — dispatch-time keyword
+  scorer extracted from the platform's ``ToolSelector`` class. Pure
+  Python, no DB, no I/O. Public API:
+  - ``select_tools(tools, request_text, *, max_candidates=5,
+    include_missing_accounts=False, on_unmatched=None,
+    redactor=None) -> list[ResolvedToolDefinition]``: rank candidates
+    by overlap, readiness, approval friction, and cost; hard-filter
+    missing-account action / payment tools by default; emit gap
+    signals via the optional callback for the three documented
+    miss conditions.
+  - ``UnmatchedRequestSignal``: frozen dataclass surfaced to the
+    caller's ``on_unmatched`` sink. Carries the redacted request
+    sample, sorted-unique stop-word-filtered token list, and a
+    SHA-256 shape hash over the first 16 tokens — same shape as
+    the platform's ``UnmatchedCapabilityRequest`` row, minus
+    host-specific identifiers (caller captures those in closure).
+  - ``strip_long_alphanumeric_secrets(text)``: Q4-style backstop
+    that catches long hex / base64 runs a primary key-pattern
+    redactor might miss. Public so callers can chain it after
+    their own redactor in ``select_tools``'s ``redactor`` arg.
+  - ``MissKind`` Literal, ``OnUnmatchedCallback`` /
+    ``RedactorCallback`` aliases, plus the ``DEFAULT_MAX_CANDIDATES``
+    / ``UNMATCHED_STOP_WORDS`` / ``UNMATCHED_MAX_TOKENS_FOR_HASH``
+    / ``UNMATCHED_TEXT_MAX_LEN`` public constants.
+
+### Repository pattern (callback-injection, not full DI)
+
+The platform's ``ToolSelector`` persisted gap signals via SQLAlchemy
+``session.begin_nested()`` (SAVEPOINT). Extracting that meant
+choosing between two repository patterns:
+
+1. Inject a full ``UnmatchedRequestRepository`` interface that
+   agent-core depends on at the type level.
+2. Inject a single ``on_unmatched: Callable[[UnmatchedRequestSignal],
+   None]`` callback that the caller wraps however it wants.
+
+This release ships option 2: a plain callable, no abstract base
+class, no protocol. Rationale: the platform writes one row per miss;
+a CLI / eval harness might just append to a list; a queue worker
+might enqueue a message. A formal interface would impose a single
+storage shape on every host, which is overkill for a single-method
+repository. If a future module ever needs richer query-back semantics
+(``load_recent_misses(...)``, ``aggregate_by_shape(...)``) it'll
+introduce a proper protocol then; this module never reads back.
+
+Exception isolation: callback failures are caught and logged at
+WARNING. agent-core never raises out of a telemetry sink — the
+request path keeps running even if the gap-report storage is offline.
+
+### Notes
+
+- 41 new tests in ``tests/test_tool_selector.py`` covering empty-input
+  short-circuits, scoring (overlap + readiness + auto-readonly +
+  approval-friction + cost), the missing-account hard filter (and its
+  ``include_missing_accounts`` escape hatch), all three miss-kinds,
+  hash determinism across word-order, the 16-token cap, the 200-char
+  text cap, redactor exception isolation, callback exception
+  isolation, and the closure-capture pattern for caller context.
+  Plus a smoke-test entry pinning the public import surface.
+- Test count: 51 → 93.
+- The platform's ``ToolSelector`` becomes a thin shim that wires the
+  ``session.begin_nested()`` SAVEPOINT into the ``on_unmatched``
+  callback and lazy-imports the existing ``preview_redaction``
+  module as the ``redactor``. Production runs on the same selection
+  code that ships here.
+
+### Roadmap (no change)
+
+- **v0.4 (Tier B Phase 2 cont.)**: pure halves of ``dev_simulator``
+  and ``capability_failure_learning``. Same callback pattern applies
+  for their (smaller) DB touchpoints.
+- **v0.5 (Tier C)**: split ``tool_use_runtime.orchestrate`` into a
+  pure-planner half (open) and a platform-glue half (private). The
+  selector + prefilter together cover catalog shaping; orchestrate
+  covers the multi-turn loop.
+
 ## [0.2.6] - 2026-05-02
 
 Older codex-bot review findings on PRs #1 (release.yml) and #2

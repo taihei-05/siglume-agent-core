@@ -12,7 +12,23 @@ from __future__ import annotations
 def test_package_version_present():
     import siglume_agent_core
 
-    assert siglume_agent_core.__version__ == "0.2.6"
+    assert siglume_agent_core.__version__ == "0.3.0"
+
+
+def test_tool_selector_imports():
+    from siglume_agent_core.tool_selector import (
+        DEFAULT_MAX_CANDIDATES,
+        UnmatchedRequestSignal,
+        extract_trigger_words,
+        select_tools,
+        strip_long_alphanumeric_secrets,
+    )
+
+    assert callable(select_tools)
+    assert callable(strip_long_alphanumeric_secrets)
+    assert callable(extract_trigger_words)
+    assert DEFAULT_MAX_CANDIDATES == 5
+    assert UnmatchedRequestSignal.__module__ == "siglume_agent_core.tool_selector"
 
 
 def test_tool_manual_validator_imports():
