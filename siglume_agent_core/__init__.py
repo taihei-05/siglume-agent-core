@@ -51,7 +51,7 @@ Tier C Phase 1 (v0.5):
   ``DEFAULT_MODEL_PRICE_PER_MTOKEN_CENTS`` table), and the approval predicates
   ``execution_context_requires_approval`` / ``permission_can_run_without_approval``.
 
-Tier C Phase 2 (v0.6, this release):
+Tier C Phase 2 (v0.6):
 - ``orchestrate``: the orchestrate inner loop, lifted out of the
   platform's ~990-line ``ToolUseRuntime.orchestrate`` method. The platform
   passes a callback bag (``OrchestrationDispatcher`` — five callables for
@@ -66,7 +66,31 @@ Tier C Phase 2 (v0.6, this release):
   fires on iteration 0 when the primary OpenAI adapter raises — the same
   policy the platform had inline.
 
+Tier C Phase 3 (v0.7, this release):
+- ``dev_simulator``: pure helpers for the publisher dev-simulator —
+  the read-only "what would the planner have done?" preview. Stages 2-4
+  of the four-stage pipeline (keyword pre-filter, dedupe / Anthropic-
+  regex filter, single tool_choice="auto" turn, predicted-chain
+  reconstruction) move out of the platform's
+  ``capability_runtime.dev_simulator``. The platform passes already-
+  fetched ``(ProductListingLike, CapabilityReleaseLike)`` rows (Protocols
+  — no SQLAlchemy import) plus an injected ``LLMSimulateCall`` callable
+  so agent-core never touches an ORM session or the Anthropic SDK.
+  Public surface: ``simulate_planner`` (high-level entry),
+  ``select_candidates`` / ``filter_tools_for_anthropic`` (composable
+  primitives), ``extract_keywords`` / ``score_candidate`` /
+  ``build_tool_def`` / ``sanitize_input_schema_for_anthropic`` (tested
+  in isolation), public constants ``SIMULATE_MODEL`` /
+  ``SIMULATE_SYSTEM_PROMPT`` / ``STOP_WORDS`` /
+  ``ANTHROPIC_PROPERTY_KEY_RE`` / ``ANTHROPIC_TOOL_NAME_RE``, and
+  the ``LLMSimulateCall`` / ``LLMSimulateResponse`` /
+  ``LLMSimulateToolUseBlock`` provider-neutral message types. All four
+  diagnostic ``SimulationResult.note`` strings the monorepo shipped
+  pre-extraction are produced verbatim — empty offer, empty catalog,
+  all-filtered, LLM picked nothing, and any caller-supplied
+  ``error_note`` propagated as-is.
+
 See ARCHITECTURE.md for the staged extraction roadmap.
 """
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"
