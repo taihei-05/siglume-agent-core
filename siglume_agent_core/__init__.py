@@ -93,4 +93,4 @@ Tier C Phase 3 (v0.7, this release):
 See ARCHITECTURE.md for the staged extraction roadmap.
 """
 
-__version__ = "0.7.0"
+__version__ = "0.7.1"
