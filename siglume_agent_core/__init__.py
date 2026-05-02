@@ -23,7 +23,7 @@ Tier B Phase 2 (v0.3):
   ``strip_long_alphanumeric_secrets`` is exposed publicly for callers
   composing their own request-text redactor.
 
-Tier B Phase 2 cont. (v0.4, this release):
+Tier B Phase 2 cont. (v0.4):
 - ``capability_failure_learning``: pure decision functions feeding the
   platform's tool-failure memory cards. Classify execution outcomes
   (``failure_kind_from_execution``), bucket requests into task families
@@ -37,7 +37,23 @@ Tier B Phase 2 cont. (v0.4, this release):
   is injected: ``learning_expiry_for_kind`` requires ``now`` as a
   keyword arg so the function is fully pure.
 
+Tier C Phase 1 (v0.5, this release):
+- ``orchestrate_helpers``: byte-equivalent companions of the platform's
+  ``tool_use_runtime`` orchestrate path with no DB / gateway / SDK
+  dependency. ``OwnerOperationToolDefinition`` (value shape for first-party
+  owner operations exposed to the orchestrator), ``to_provider_tool``
+  (convert resolved or owner-operation tool to ProviderToolDefinition with
+  description composition mirrored byte-for-byte), ``build_orchestrate_system_prompt``
+  (render the manifest + role + format rules + multi-capability buyer-input
+  mapping + revision guard + goal — clock is injected via ``now``),
+  ``extract_llm_usage`` / ``estimate_usd_cents`` (provider-neutral usage
+  normaliser + preflight USD-cents estimator with public
+  ``DEFAULT_MODEL_PRICE_PER_MTOKEN_CENTS`` table), and the approval predicates
+  ``execution_context_requires_approval`` / ``permission_can_run_without_approval``.
+  The orchestrate inner loop body itself stays in the platform for v0.5;
+  v0.6 lifts it into agent-core via a callback bag.
+
 See ARCHITECTURE.md for the staged extraction roadmap.
 """
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"

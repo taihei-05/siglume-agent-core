@@ -11,6 +11,81 @@ public API while extraction from the private monorepo is in progress.
 
 (no changes)
 
+## [0.5.0] - 2026-05-02
+
+Tier C Phase 1. The pure helpers feeding the platform's
+``tool_use_runtime`` orchestrate path land as public source. The
+orchestrate inner loop body itself stays in the platform for now — see
+the v0.5 recon notes; a follow-up release will lift the loop into
+agent-core via a callback bag (``OrchestrationDispatcher``).
+
+### Added
+
+- **``siglume_agent_core.orchestrate_helpers``** — pure helpers the
+  platform composes into its ``ToolUseRuntime.orchestrate`` body. Public
+  API:
+  - ``OwnerOperationToolDefinition``: value shape for first-party owner
+    operations exposed to the orchestrator alongside installed APIs.
+    The ``safety`` field is typed ``Any`` so agent-core stays free of
+    the platform's ``OperationSafetyMetadata`` dependency. Pure helpers
+    do not read ``safety``; the platform shim accesses it directly.
+  - ``to_provider_tool(tool, *, learned_guidance=None)``: dispatch by
+    type — ``OwnerOperationToolDefinition`` uses a strict empty-schema
+    fallback (``additionalProperties: false``); ``ResolvedToolDefinition``
+    composes display_name + description + compact_prompt + usage_hints
+    + optional learned-guidance, joins with ``\n``, clips to 1024 chars,
+    and falls back to ``tool_name`` when every piece is empty. The
+    description composition order is byte-equivalent with the
+    pre-v0.5 platform helper.
+  - ``build_orchestrate_system_prompt(*, goal, manifest_text, tool_count,
+    now, input_schema_map=None, client_input_keys=None,
+    planned_tool_names=None, is_revision=False)``: render the manifest +
+    role + format-rules + multi-capability buyer-input mapping +
+    revision guard + goal sections. Clock is injected via ``now`` so
+    the helper is fully pure and testable with a frozen instant
+    (mirrors v0.4 ``learning_expiry_for_kind``'s clock-injection
+    pattern). Whitespace-only ``manifest_text`` is treated as empty so
+    the OWNER DIRECTIVES header is not emitted for blank manifests.
+  - ``extract_llm_usage(raw_payload)``: provider-neutral usage
+    normaliser — Anthropic ``input_tokens / output_tokens`` and OpenAI
+    ``prompt_tokens / completion_tokens`` both fold into
+    ``{input_tokens, output_tokens}``. Anthropic-style keys win when
+    both shapes are present.
+  - ``estimate_usd_cents(model, input_tokens, output_tokens, *,
+    price_table=None, fallback_price=FALLBACK_PRICE_PER_MTOKEN_CENTS)``:
+    preflight USD-cents estimator for the daily-cap check. Reads the
+    public ``DEFAULT_MODEL_PRICE_PER_MTOKEN_CENTS`` table by default,
+    rounds UP so the cap stays slightly conservative, and lower-cases
+    ``model`` before lookup so casing drift in the caller doesn't
+    bypass the cap.
+  - ``execution_context_requires_approval(execution_context)`` /
+    ``permission_can_run_without_approval(permission_class)``: small
+    policy predicates with the same truthy-string set
+    (``"true" / "yes" / "1" / "on" / "y"``) as the platform.
+    ``permission_can_run_without_approval`` normalises hyphenated
+    permission_class strings (``"read-only"``) to the underscore form
+    (``"read_only"``) so legacy callers pre-dating the v0.2.2 spelling
+    fix don't accidentally force-gate free-to-execute tools behind
+    approval.
+- Public price-table data: ``DEFAULT_MODEL_PRICE_PER_MTOKEN_CENTS``
+  (input/output cents per million tokens for the documented Claude
+  + GPT models) and ``FALLBACK_PRICE_PER_MTOKEN_CENTS`` (the mid-tier
+  tuple used for unknown models so they neither bypass nor block the
+  daily cap).
+
+### Tests
+
+- 39 new unit tests (``tests/test_orchestrate_helpers.py``) covering
+  description composition order, schema-fallback strictness divergence
+  between owner-operation and installed tool branches, system-prompt
+  rendering with frozen clock, manifest whitespace handling,
+  multi-capability input-schema-map rendering, planned-tools and
+  revision guards, Anthropic vs OpenAI usage shapes, round-up rounding
+  in the cents estimator, model-id case insensitivity, custom
+  price-table override, the documented price-table pin, and both
+  approval predicates' truthy / falsy / drift cases.
+- Smoke test pinned to ``__version__ == "0.5.0"``.
+
 ## [0.4.0] - 2026-05-02
 
 Tier B Phase 2 cont. The pure decision functions feeding the platform's
