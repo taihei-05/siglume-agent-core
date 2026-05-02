@@ -12,7 +12,34 @@ from __future__ import annotations
 def test_package_version_present():
     import siglume_agent_core
 
-    assert siglume_agent_core.__version__ == "0.4.0"
+    assert siglume_agent_core.__version__ == "0.5.0"
+
+
+def test_orchestrate_helpers_imports():
+    from siglume_agent_core.orchestrate_helpers import (
+        DEFAULT_MODEL_PRICE_PER_MTOKEN_CENTS,
+        FALLBACK_PRICE_PER_MTOKEN_CENTS,
+        OwnerOperationToolDefinition,
+        build_orchestrate_system_prompt,
+        estimate_usd_cents,
+        execution_context_requires_approval,
+        extract_llm_usage,
+        permission_can_run_without_approval,
+        to_provider_tool,
+    )
+
+    for fn in (
+        build_orchestrate_system_prompt,
+        estimate_usd_cents,
+        execution_context_requires_approval,
+        extract_llm_usage,
+        permission_can_run_without_approval,
+        to_provider_tool,
+    ):
+        assert callable(fn)
+    assert isinstance(DEFAULT_MODEL_PRICE_PER_MTOKEN_CENTS, dict)
+    assert isinstance(FALLBACK_PRICE_PER_MTOKEN_CENTS, tuple)
+    assert OwnerOperationToolDefinition.__module__ == "siglume_agent_core.orchestrate_helpers"
 
 
 def test_tool_selector_imports():
