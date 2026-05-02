@@ -11,6 +11,56 @@ public API while extraction from the private monorepo is in progress.
 
 (no changes)
 
+## [0.7.1] - 2026-05-02
+
+Documentation-only patch release. No runtime / API changes — the
+v0.7.1 wheel is byte-equivalent to v0.7.0 except for the README and
+ARCHITECTURE rendered on PyPI. Cut so that
+`pip show siglume-agent-core` and the project's pypi.org page reflect
+the doc fixes that already landed on `main` after v0.7.0 was tagged.
+
+### Fixed
+
+- **README — `tool_selector` miss-kind names match the implementation.**
+  Previous text listed `no_candidates_after_prefilter` /
+  `no_candidates_after_permission_filter` / `no_keyword_overlap`. The
+  `MissKind` `Literal` actually exports `no_tools_installed` /
+  `all_filtered_account_missing` / `no_keyword_match`; an
+  `on_unmatched` callback written against the README names would
+  never fire. Updated to the actual names with one-line definitions
+  and the four trigger-word source fields (`capability_key` /
+  `display_name` / `description` / `usage_hints`).
+
+- **README — `capability_failure_learning` example matches the v0.4
+  signatures.** Previous snippet used an old positional shape
+  (`failure_kind_from_execution(execution_result)`,
+  `build_learning_content(kind, family, intent_text)`, single
+  `scores` return). Replaced with a runnable shape using the actual
+  keyword-only signatures: `failure_kind_from_execution(*, status,
+  api_outcome, details)`, `infer_capability_task_family(user_message,
+  goal)`, `build_learning_content(*, tool, failure_kind, task_family,
+  request_preview)` (which takes a `ResolvedToolDefinition`), and
+  `learning_scores_for_kind(kind) -> tuple[float, float]`. Walks
+  `api_outcome` → `failure_kind` → `task_family` → expiry / scores /
+  content, with a sentence calling out where each input variable
+  comes from in an orchestrator.
+
+- **README — `siglume dev simulate` is current, not "upcoming".** The
+  CLI is already shipped at `dev_command.command("simulate")` in
+  `siglume-api-sdk`. Updated wording and added a short
+  `LLMSimulateCall` self-host example that follows the documented
+  "MUST NOT raise" contract by returning `LLMSimulateResponse(
+  tool_use_blocks=[], error_note="...")` instead of bubbling the
+  exception (since `simulate_planner` does not catch exceptions out
+  of `llm_call`).
+
+- **README — `tool_choice="none"` description is provider-accurate.**
+  Previous one-liner said the adapter elides `tools` entirely. That's
+  true for Anthropic (no native `"none"` mode) but the OpenAI adapter
+  passes OpenAI's native `tool_choice="none"` alongside the `tools`
+  array. Updated to call out the per-adapter mechanism while noting
+  both still produce zero tool calls.
+
 ## [0.7.0] - 2026-05-02
 
 Tier C Phase 3. The publisher dev-simulator's pure stages move into
