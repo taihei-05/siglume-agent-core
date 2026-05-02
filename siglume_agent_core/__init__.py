@@ -37,7 +37,7 @@ Tier B Phase 2 cont. (v0.4):
   is injected: ``learning_expiry_for_kind`` requires ``now`` as a
   keyword arg so the function is fully pure.
 
-Tier C Phase 1 (v0.5, this release):
+Tier C Phase 1 (v0.5):
 - ``orchestrate_helpers``: byte-equivalent companions of the platform's
   ``tool_use_runtime`` orchestrate path with no DB / gateway / SDK
   dependency. ``OwnerOperationToolDefinition`` (value shape for first-party
@@ -50,10 +50,23 @@ Tier C Phase 1 (v0.5, this release):
   normaliser + preflight USD-cents estimator with public
   ``DEFAULT_MODEL_PRICE_PER_MTOKEN_CENTS`` table), and the approval predicates
   ``execution_context_requires_approval`` / ``permission_can_run_without_approval``.
-  The orchestrate inner loop body itself stays in the platform for v0.5;
-  v0.6 lifts it into agent-core via a callback bag.
+
+Tier C Phase 2 (v0.6, this release):
+- ``orchestrate``: the orchestrate inner loop, lifted out of the
+  platform's ~990-line ``ToolUseRuntime.orchestrate`` method. The platform
+  passes a callback bag (``OrchestrationDispatcher`` — five callables for
+  policy / read-only execute / dry-run / owner-op dispatch / awaiting-
+  approval emit) so the loop can ask the gateway to do its DB / outbox
+  side-effects without agent-core importing the gateway, the ORM session,
+  or the outbox. The loop returns an ``OrchestrationOutcome`` record;
+  the platform shim reads it and persists receipt / outbox / failure-
+  learning rows itself. ``early_return_result`` carries the
+  ExecutionResult to return verbatim when an approval short-circuits the
+  loop. Cross-provider fallback (``CROSS_PROVIDER_FALLBACK_MODEL``) only
+  fires on iteration 0 when the primary OpenAI adapter raises — the same
+  policy the platform had inline.
 
 See ARCHITECTURE.md for the staged extraction roadmap.
 """
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"

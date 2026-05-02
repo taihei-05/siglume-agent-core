@@ -11,6 +11,86 @@ public API while extraction from the private monorepo is in progress.
 
 (no changes)
 
+## [0.6.0] - 2026-05-02
+
+Tier C Phase 2. The orchestrate inner loop body itself moves into
+agent-core. The platform's ``ToolUseRuntime.orchestrate`` shrinks from
+~990 lines to a ~300-line shim that does intent fetch / capability
+preflight / tool resolution before the loop and receipt / outbox /
+failure-learning bookkeeping after.
+
+### Added
+
+- **``siglume_agent_core.orchestrate``** — new module with the pure
+  per-iteration tool-use loop.
+
+  - ``OrchestrationDispatcher`` (frozen dataclass) — five callables
+    bridging the loop to the platform's gateway / DB / outbox:
+    ``check_policy`` (Decision), ``execute_read_only`` (ExecutionResult),
+    ``execute_dry_run`` (DryResult), ``dispatch_owner_operation``
+    (ExecutionResult — wrapper internally writes ``intent.plan_jsonb``
+    on ``approval_required``), ``emit_awaiting_approval``
+    (ExecutionResult — wrapper internally mutates intent.status /
+    metadata_jsonb / plan_jsonb + emits the outbox event).
+
+  - ``OrchestrationOutcome`` (frozen dataclass) — the loop's return
+    value: ``final_text`` / ``step_results`` / ``last_tool_output`` /
+    ``total_tool_calls`` / ``iterations_used`` / ``llm_input_tokens_total``
+    / ``llm_output_tokens_total`` / ``final_status`` (one of
+    ``"completed" / "failed" / "approval_required"``) /
+    ``failure_error_class`` / ``failure_error_message`` /
+    ``resolved_model`` / ``early_return_result`` (set when an approval
+    short-circuits the loop; the platform shim returns it verbatim).
+
+  - ``run_orchestrate_loop(*, intent, resolved_model, tool_by_name,
+    provider_tools, system_prompt, initial_user_message, max_iterations,
+    max_tool_calls, max_output_tokens, exec_ctx,
+    require_approval_for_actions, dispatcher, make_adapter)
+    -> OrchestrationOutcome``.
+
+  - Public constants: ``OPENAI_MODEL_PREFIXES`` /
+    ``ANTHROPIC_MODEL_PREFIXES`` / ``CROSS_PROVIDER_FALLBACK_MODEL``.
+    Cross-provider fallback fires only on iteration 0 when the
+    primary model is OpenAI and the adapter raises — same policy the
+    platform had inline. A second failure (Anthropic also down)
+    propagates honestly so capability_failure_learning records the
+    right ``error_class``.
+
+### Behavior preserved (byte-equivalent)
+
+- ``step_results`` dict shape per tool call — exact key set, exact
+  ordering across owner_operation / installed_tool / unknown_tool /
+  policy_denied / approval_required paths.
+- ``messages`` ToolMessage construction order across iterations.
+- LLM usage accumulation via ``extract_llm_usage`` (already in v0.5)
+  every turn including the cross-provider fallback turn.
+- ``final_status`` derivation: any successful step => completed;
+  otherwise the last failed (non-approval_required) step's
+  ``error_class`` / ``error_message`` win, with the same
+  ``"tool_execution_failed"`` / ``"All orchestrated tool invocations
+  failed."`` fallbacks the platform used.
+- ``iterations_used`` matches the monorepo's ``min(iteration + 1,
+  max_iterations) if last_turn else 0`` formula.
+
+### Notes
+
+- The platform's ``_fail_intent("approval_preview_failed")`` path
+  (dry-run preview itself fails) surfaces as ``OrchestrationOutcome(
+  final_status="failed", failure_error_class="approval_preview_failed",
+  early_return_result=None)``. The platform shim is expected to route
+  this specific error class through ``_fail_intent`` rather than the
+  normal post-loop receipt path. This keeps the loop pure (no
+  ``_fail_intent`` callback in the dispatcher) at the cost of one
+  branch in the shim.
+- ``intent`` is opaque to the loop except for one read:
+  ``intent.status`` is consulted in the installed-tool approval guard
+  to skip the dry-run when the intent has already been approved
+  out-of-band.
+- ``make_adapter`` is injected so callers can swap in their own
+  adapter factory; the platform shim continues to use its existing
+  ``_make_adapter`` which already imports from
+  ``siglume_agent_core.provider_adapters``.
+
 ## [0.5.0] - 2026-05-02
 
 Tier C Phase 1. The pure helpers feeding the platform's
