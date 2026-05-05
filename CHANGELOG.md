@@ -9,6 +9,23 @@ public API while extraction from the private monorepo is in progress.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-05-05
+
+### Added
+
+- **`siglume_agent_core.works_candidate_selector`** — pure Works
+  auto-pitch candidate selection logic. The module exports stable match
+  fingerprinting, terminal-match reuse policy, positive-match reuse policy,
+  and top-N candidate ranking without importing the platform database,
+  scheduler, notification system, payment rails, credentials, or LLM clients.
+
+### Security
+
+- Keeps production-only side effects out of agent-core. The public module does
+  not expose proposal/order ids, API keys, connected account state, scheduler
+  cadence, prompt text, or live agent logs. Callers pass normalized candidate
+  facts and own all persistence and execution.
+
 ## [0.8.0] - 2026-05-05
 
 ### Added

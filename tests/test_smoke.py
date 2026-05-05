@@ -12,7 +12,7 @@ from __future__ import annotations
 def test_package_version_present():
     import siglume_agent_core
 
-    assert siglume_agent_core.__version__ == "0.8.0"
+    assert siglume_agent_core.__version__ == "0.9.0"
 
 
 def test_job_feasibility_imports():
@@ -25,6 +25,34 @@ def test_job_feasibility_imports():
     assert JobFeasibilityInput.__module__ == "siglume_agent_core.job_feasibility"
     assert JobFeasibilityResult.__module__ == "siglume_agent_core.job_feasibility"
     assert callable(assess_job_feasibility)
+
+
+def test_works_candidate_selector_imports():
+    from siglume_agent_core.works_candidate_selector import (
+        WorksAgentFingerprintInput,
+        WorksCandidateInput,
+        WorksCandidateSelection,
+        WorksJobFingerprintInput,
+        make_works_match_fingerprint,
+        rank_works_agent_candidates,
+        should_reuse_matched_works_match,
+        should_reuse_works_match,
+    )
+
+    for typ in (
+        WorksAgentFingerprintInput,
+        WorksCandidateInput,
+        WorksCandidateSelection,
+        WorksJobFingerprintInput,
+    ):
+        assert typ.__module__ == "siglume_agent_core.works_candidate_selector"
+    for fn in (
+        make_works_match_fingerprint,
+        rank_works_agent_candidates,
+        should_reuse_matched_works_match,
+        should_reuse_works_match,
+    ):
+        assert callable(fn)
 
 
 def test_dev_simulator_imports():

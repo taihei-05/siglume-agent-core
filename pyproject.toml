@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "siglume-agent-core"
-version = "0.8.0"
+version = "0.9.0"
 description = "Open-core orchestrator logic for the Siglume API Store agent runtime — tool-manual quality scoring + LLM provider tool adapters + installed-tool prefilter + keyword-based tool selector + capability-failure learning helpers + orchestrate system-prompt / provider-tool / cost-estimation helpers + orchestrate inner loop with dispatcher callback bag + publisher dev-simulator pure helpers."
 readme = "README.md"
 license = { text = "AGPL-3.0-only" }

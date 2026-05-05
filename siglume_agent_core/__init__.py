@@ -97,7 +97,14 @@ Tier D Phase 1 (v0.8, this release):
   blocked. Persistence, notifications, proposal creation, and deeper
   agent/capability matching remain in the platform.
 
+Tier D Phase 2 (v0.9, this release):
+- ``works_candidate_selector``: pure Works auto-pitch candidate selection.
+  Exposes deterministic fingerprinting, terminal-match reuse policy, positive
+  match reuse policy, and top-N candidate ranking. The platform still owns the
+  DB-backed match table, LLM fit judgment, pitch creation, notifications, and
+  payments.
+
 See ARCHITECTURE.md for the staged extraction roadmap.
 """
 
-__version__ = "0.8.0"
+__version__ = "0.9.0"

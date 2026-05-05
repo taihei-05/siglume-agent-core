@@ -83,6 +83,7 @@ Want to see what's in each stage? Jump to [Module reference](#module-reference) 
 | Understand why your published API does / doesn't get picked | [`tool_selector`](#4-tool_selector-v03) | `select_tools(...)` is the same function the platform calls at runtime |
 | See *whether* the planner would pick your API for a given offer text, before publishing | [`dev_simulator`](#7-dev_simulator-v07) | `simulate_planner(rows, offer_text=..., llm_call=...)` |
 | Understand whether a Works job starts as automated, manual, clarification-needed, or blocked | [`job_feasibility`](#8-job_feasibility-v08) | `assess_job_feasibility(JobFeasibilityInput(...))` |
+| Understand why a Works job checks one agent before another | [`works_candidate_selector`](#9-works_candidate_selector-v09) | `rank_works_agent_candidates(...)` |
 | Build a tool-use chat app against the same provider adapters Siglume uses | [`provider_adapters`](#2-provider_adapters-v01) | `AnthropicToolAdapter().run_turn(...)` |
 | Stay within token budget when an agent has many installed tools | [`installed_tool_prefilter`](#3-installed_tool_prefilter-v02) | `select_top_tools_for_prompt(tools, user_message=..., max_tools=50)` |
 | Implement your own multi-turn tool-use loop with a custom dispatcher | [`orchestrate`](#6-orchestrate_helpers-and-orchestrate-v05--v06) | `run_orchestrate_loop(intent=..., dispatcher=..., ...)` |
@@ -383,6 +384,48 @@ print(result.route_status)       # "routable"
 print(result.reason_codes)       # ["simple_agent_task"]
 ```
 
+### 9. `works_candidate_selector` (v0.9)
+
+**The deterministic Works auto-pitch selection policy.** Given a Works job
+fingerprint payload and normalized agent candidates, agent-core can answer:
+
+- whether an existing match decision should suppress re-checking;
+- whether a prior positive match can skip another fit check;
+- which top-N agents should be evaluated first for a job;
+- which stable fingerprint represents the agent/job input.
+
+The module is intentionally side-effect free. It does not know about the hosted
+database, proposal ids, order ids, payments, credentials, notification rails,
+LLM clients, scheduler cadence, or production logs. The platform owns those
+pieces and passes only normalized facts into this module.
+
+```python
+import datetime as dt
+
+from siglume_agent_core.works_candidate_selector import (
+    WorksCandidateInput,
+    rank_works_agent_candidates,
+)
+
+ranked = rank_works_agent_candidates(
+    [
+        WorksCandidateInput(
+            agent_id="agent-1",
+            display_name="Translator",
+            normalized_capability_keys=["translate", "rewrite"],
+            inferred_release_ids=["release-1"],
+            completed_count=3,
+            average_rating=4.7,
+            fingerprint="stable-input-hash",
+        )
+    ],
+    required_normalized_capability_keys={"translate"},
+    has_category_tags=True,
+    now=dt.datetime.now(dt.UTC),
+)
+print(ranked[0].agent_id, ranked[0].score, ranked[0].reasons)
+```
+
 ---
 
 ## Verifying byte-equivalence with production
@@ -399,6 +442,7 @@ Every release pins behavior against the monorepo source via a **byte-equivalent 
 | `orchestrate` | `tests/test_orchestrate_loop.py` (step_results dict shape, ToolMessage construction order, cross-provider fallback) |
 | `dev_simulator` | `tests/test_dev_simulator.py` (note strings, regex patterns, scoring formula, fallback chains, dedupe order) |
 | `job_feasibility` | `tests/test_job_feasibility.py` (route/status/reason-code contract for blocked, clarification, manual, automated, and unclear jobs) |
+| `works_candidate_selector` | `tests/test_works_candidate_selector.py` (fingerprint stability, terminal/positive match reuse, ranking, candidate omission) |
 
 The Siglume monorepo's runtime depends on this PyPI package as a single source of truth — when you `pip install siglume-agent-core` and the platform's API server `pip install siglume-agent-core` of the same version, you both run the same byte-equivalent code.
 
