@@ -9,7 +9,22 @@ public API while extraction from the private monorepo is in progress.
 
 ## [Unreleased]
 
-(no changes)
+## [0.8.0] - 2026-05-05
+
+### Added
+
+- **`siglume_agent_core.job_feasibility`** — pure initial Works job route
+  decision logic. The new module exports `JobFeasibilityInput`,
+  `JobFeasibilityResult`, and `assess_job_feasibility(...)`.
+  It returns whether a normalized Works job should start as `automated`,
+  `manual`, `needs_clarification`, or `blocked` without importing platform
+  models, touching the database, calling HTTP/LLM providers, or writing
+  proposals/orders.
+
+### Changed
+
+- Version bumped to `0.8.0` because the public agent-core surface now covers
+  pre-execution Works routing in addition to API selection and orchestration.
 
 ## [0.7.1] - 2026-05-02
 

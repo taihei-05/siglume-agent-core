@@ -27,7 +27,7 @@ The platform is a hosted service — publishers, buyers, payments, identity, and
 
 ## How your API actually gets selected — the full pipeline
 
-Every module in this repo plays one stage of the pipeline below. **All 7 stages are open source**, byte-equivalent with production. The platform's monorepo imports this package; the same code path runs whether you `pip install` it locally or hit `siglume.com`.
+Every module in this repo plays one stage of the pipeline below. **The decision stages listed here are open source**, byte-equivalent with production. The platform's monorepo imports this package; the same code path runs whether you `pip install` it locally or hit `siglume.com`.
 
 ```
    ┌────────────────────────────────────────────────────────────┐
@@ -82,6 +82,7 @@ Want to see what's in each stage? Jump to [Module reference](#module-reference) 
 | Predict whether your tool manual will pass the publish gate | [`tool_manual_validator`](#1-tool_manual_validator-v01) | `score_manual_quality(manual).grade in ("A", "B")` |
 | Understand why your published API does / doesn't get picked | [`tool_selector`](#4-tool_selector-v03) | `select_tools(...)` is the same function the platform calls at runtime |
 | See *whether* the planner would pick your API for a given offer text, before publishing | [`dev_simulator`](#7-dev_simulator-v07) | `simulate_planner(rows, offer_text=..., llm_call=...)` |
+| Understand whether a Works job starts as automated, manual, clarification-needed, or blocked | [`job_feasibility`](#8-job_feasibility-v08) | `assess_job_feasibility(JobFeasibilityInput(...))` |
 | Build a tool-use chat app against the same provider adapters Siglume uses | [`provider_adapters`](#2-provider_adapters-v01) | `AnthropicToolAdapter().run_turn(...)` |
 | Stay within token budget when an agent has many installed tools | [`installed_tool_prefilter`](#3-installed_tool_prefilter-v02) | `select_top_tools_for_prompt(tools, user_message=..., max_tools=50)` |
 | Implement your own multi-turn tool-use loop with a custom dispatcher | [`orchestrate`](#6-orchestrate_helpers-and-orchestrate-v05--v06) | `run_orchestrate_loop(intent=..., dispatcher=..., ...)` |
@@ -351,6 +352,37 @@ def my_anthropic_call(system_prompt, tools, user_msg) -> LLMSimulateResponse:
     return LLMSimulateResponse(tool_use_blocks=parse(resp), error_note=None)
 ```
 
+### 8. `job_feasibility` (v0.8)
+
+**The first Works route decision.** Given a normalized Works job payload,
+agent-core returns whether the job should start on the automated agent route,
+the manual contractor route, a clarification flow, or a blocked state.
+
+The function is pure. It does not inspect accounts, read a database, call an
+LLM, write proposals, create orders, or send notifications. The hosted
+platform owns those side effects and passes only the job payload and capability
+tag hints into agent-core.
+
+```python
+from siglume_agent_core.job_feasibility import (
+    JobFeasibilityInput,
+    assess_job_feasibility,
+)
+
+result = assess_job_feasibility(
+    JobFeasibilityInput(
+        title="Translate onboarding copy",
+        problem_statement="Translate the onboarding copy and return the rewritten text.",
+        job_category="writing",
+        available_capability_tags=["translate", "rewrite", "docs"],
+    )
+)
+
+print(result.fulfillment_route)  # "automated"
+print(result.route_status)       # "routable"
+print(result.reason_codes)       # ["simple_agent_task"]
+```
+
 ---
 
 ## Verifying byte-equivalence with production
@@ -366,6 +398,7 @@ Every release pins behavior against the monorepo source via a **byte-equivalent 
 | `orchestrate_helpers` | `tests/test_orchestrate_helpers.py` (multi-capability prompt rendering matches monorepo verbatim, byte-for-byte) |
 | `orchestrate` | `tests/test_orchestrate_loop.py` (step_results dict shape, ToolMessage construction order, cross-provider fallback) |
 | `dev_simulator` | `tests/test_dev_simulator.py` (note strings, regex patterns, scoring formula, fallback chains, dedupe order) |
+| `job_feasibility` | `tests/test_job_feasibility.py` (route/status/reason-code contract for blocked, clarification, manual, automated, and unclear jobs) |
 
 The Siglume monorepo's runtime depends on this PyPI package as a single source of truth — when you `pip install siglume-agent-core` and the platform's API server `pip install siglume-agent-core` of the same version, you both run the same byte-equivalent code.
 

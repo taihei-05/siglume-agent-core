@@ -66,7 +66,7 @@ Tier C Phase 2 (v0.6):
   fires on iteration 0 when the primary OpenAI adapter raises — the same
   policy the platform had inline.
 
-Tier C Phase 3 (v0.7, this release):
+Tier C Phase 3 (v0.7):
 - ``dev_simulator``: pure helpers for the publisher dev-simulator —
   the read-only "what would the planner have done?" preview. Stages 2-4
   of the four-stage pipeline (keyword pre-filter, dedupe / Anthropic-
@@ -90,7 +90,14 @@ Tier C Phase 3 (v0.7, this release):
   all-filtered, LLM picked nothing, and any caller-supplied
   ``error_note`` propagated as-is.
 
+Tier D Phase 1 (v0.8, this release):
+- ``job_feasibility``: pure initial Works job routing. The platform passes a
+  normalized job payload and available capability tags; agent-core returns
+  whether the job is ``automated`` or ``manual``, needs clarification, or is
+  blocked. Persistence, notifications, proposal creation, and deeper
+  agent/capability matching remain in the platform.
+
 See ARCHITECTURE.md for the staged extraction roadmap.
 """
 
-__version__ = "0.7.1"
+__version__ = "0.8.0"
